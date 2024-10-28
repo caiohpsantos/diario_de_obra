@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit_authenticator as stauth
 from streamlit_option_menu import option_menu
 from models import session
-from forms import cadastros, diario
+from forms import cadastros, diario, configuracoes
 
 st.set_page_config(layout="wide")
 
@@ -20,8 +20,6 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days']
 )
 
-DIR_FOTOS = config['fotos_obras']
-
 if not st.session_state['authentication_status']:
     authenticator.login()
 
@@ -31,7 +29,7 @@ if st.session_state['authentication_status']:
             st.write(f'Bem-vindo *{st.session_state["name"]}*')
             authenticator.logout()
 
-            menu = option_menu("Menu Principal", ["Diário de Obra", "Cadastros", "Relatório"])
+            menu = option_menu("Menu Principal", ["Diário de Obra", "Cadastros", "Relatório", "Configurações"])
 
     match menu:
 
@@ -61,4 +59,31 @@ if st.session_state['authentication_status']:
                 case "Novo Diário":
                     diario.novo_diario()
 
-            
+        case "Configurações":
+
+            menu_secundario = option_menu("Configurações", ["Alterar Senha", "Armazenamento Fotos"], orientation="horizontal")
+
+            match menu_secundario:
+
+                case "Alterar Senha":
+                    if st.session_state['authentication_status']:
+                        try:
+                            if authenticator.reset_password(st.session_state['username'],fields={
+                                'Form name':f'Trocar a senha de {st.session_state["name"]}',
+                                'Current password':'Senha atual',
+                                'New password':'Senha nova',
+                                'Repeat password': 'Repita a senha nova',
+                                'Reset':'Confirmar'
+                            }):
+                                with open('config.yaml', 'w') as file:
+                                    yaml.dump(config, file, default_flow_style=False)
+                                st.success('Senha alterada com sucesso')
+                        except Exception as e:
+                            st.error(e)
+                    elif st.session_state['authentication_status'] is False:
+                        st.error('Usuário ou senha incorreta. Tente novamente')
+                    elif st.session_state['authentication_status'] is None:
+                        st.warning('Faça o login para acessar o sistema')
+
+                case "Armazenamento Fotos":
+                    configuracoes.caminho_fotos()

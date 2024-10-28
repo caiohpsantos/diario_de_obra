@@ -11,11 +11,9 @@ credentials:
       name: Caio Henrique
       password: $2b$12$4HI5wv41C0L8KEdr/p5I1.sfnTTa8REOC3Js3SddvElAYz3bxWXhC
     renato.rodrigues:
-      email: 
+      email: null
       failed_login_attempts: 0
       logged_in: false
       name: Renato Rodrigues
       password: $2b$12$9XcNe/cazs6RGaP5gStNZutHKU6LpWk85Vsiziqgsq.7vpPQr.Sku
-
-fotos_obras: G:\Meu Drive\fotos_obras
-
+pasta_fotos: G:\Meu Drive\fotos_obras
