@@ -1,0 +1,21 @@
+cookie:
+  expiry_days: 1
+  key: 4HqIXo-HZaqfaiVBzBoCDGrE2ggTzSHrCnJXn_dbLlw
+  name: machado&santos_courier
+credentials:
+  usernames:
+    caio.santos:
+      email: caiohpsantos@gmail.com
+      failed_login_attempts: 0
+      logged_in: false
+      name: Caio Henrique
+      password: $2b$12$4HI5wv41C0L8KEdr/p5I1.sfnTTa8REOC3Js3SddvElAYz3bxWXhC
+    renato.rodrigues:
+      email: 
+      failed_login_attempts: 0
+      logged_in: false
+      name: Renato Rodrigues
+      password: $2b$12$9XcNe/cazs6RGaP5gStNZutHKU6LpWk85Vsiziqgsq.7vpPQr.Sku
+
+fotos_obras: G:\Meu Drive\fotos_obras
+
