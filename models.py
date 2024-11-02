@@ -69,7 +69,6 @@ class Diario(Base):
     # Relacionamento com Efetivo Indireto (um diário -> várias funções)
     efetivo_indireto = relationship('Efetivo_Indireto', back_populates='diario', cascade="all, delete-orphan")
 
-
 # Tabela Servicos
 class Servicos(Base):
     __tablename__ = 'servicos'

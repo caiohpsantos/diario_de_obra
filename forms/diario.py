@@ -5,7 +5,7 @@ from time import sleep
 from yaml import SafeLoader
 from datetime import datetime, timedelta
 from models import session, Contrato, Obra, Diario, Foto, Servicos, Efetivo_Direto, Efetivo_Indireto, Base
-from .funcionalidades import salvar_fotos_na_pasta
+from .funcionalidades import salvar_fotos_na_pasta, apagar_foto
 from sqlalchemy import func
 
 def novo_diario():
@@ -255,31 +255,6 @@ def novo_diario():
                 
                 st.success("Diário de Obra gravado com sucesso")
 
-@st.dialog("Apagar Foto")
-def apagar_foto(foto):
-    '''Remove a foto fornecida, apagando primeiro o arquivo e depois o registro do banco de dados
-    
-    :param foto: Objeto Foto, objeto instanciado de Foto, contendo os dados da foto escolhida
-    :return: mensagem de aviso sobre ter ou não concluído o processo e finaliza a janela'''
-
-    st.warning("Deseja mesmo apagar esta foto? Essa ação não poderá ser desfeita")
-    st.image(foto.caminho_arquivo, width=400)
-    col_cancelar, col_apagar = st.columns(2)
-    with col_cancelar:
-        if st.button("Não"):
-            st.error("Processo Cancelado")
-            sleep(1)
-            st.rerun()
-    
-    with col_apagar:
-        if st.button("Sim"):
-            if os.path.exists(foto.caminho_arquivo):
-                os.remove(foto.caminho_arquivo)
-            session.delete(foto)
-            session.commit()
-            st.success("Foto apagada com sucesso")
-            sleep(1)
-            st.rerun()
 
 def edita_diario():
 
