@@ -6,6 +6,7 @@ from streamlit_option_menu import option_menu
 from models import session
 from forms import cadastros, diario, configuracoes
 
+
 st.set_page_config(layout="wide")
 
 st.header("Sistema Gerenciamento Diário de Obras")
@@ -58,10 +59,13 @@ if st.session_state['authentication_status']:
 
                 case "Novo Diário":
                     diario.novo_diario()
+                
+                case "Editar Diário":
+                    diario.edita_diario()
 
         case "Configurações":
 
-            menu_secundario = option_menu("Configurações", ["Alterar Senha", "Armazenamento Fotos"], orientation="horizontal")
+            menu_secundario = option_menu("Configurações", ["Alterar Senha", "Armazenamento"], orientation="horizontal")
 
             match menu_secundario:
 
@@ -85,5 +89,5 @@ if st.session_state['authentication_status']:
                     elif st.session_state['authentication_status'] is None:
                         st.warning('Faça o login para acessar o sistema')
 
-                case "Armazenamento Fotos":
-                    configuracoes.caminho_fotos()
+                case "Armazenamento":
+                    configuracoes.armazenamento()

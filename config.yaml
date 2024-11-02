@@ -1,7 +1,7 @@
 cookie:
   expiry_days: 1
   key: 4HqIXo-HZaqfaiVBzBoCDGrE2ggTzSHrCnJXn_dbLlw
-  name: machado&santos_courier
+  name: rudra
 credentials:
   usernames:
     caio.santos:
@@ -16,4 +16,5 @@ credentials:
       logged_in: false
       name: Renato Rodrigues
       password: $2b$12$9XcNe/cazs6RGaP5gStNZutHKU6LpWk85Vsiziqgsq.7vpPQr.Sku
+
 pasta_fotos: G:\Meu Drive\fotos_obras
