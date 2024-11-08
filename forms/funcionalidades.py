@@ -2,6 +2,7 @@ import os
 import yaml
 import re
 import shutil
+from time import sleep
 from yaml import SafeLoader
 from datetime import datetime
 import streamlit as st
@@ -69,18 +70,18 @@ def salvar_fotos_na_pasta(contrato, obra, diario, arquivos):
     caminho_pasta_contrato = os.path.join(config['pasta_fotos'], contrato.nome)
     
     verificar_ou_criar_pasta(caminho_pasta_contrato)
-    
+    sleep(0.5)
     # Verifica se existe uma pasta da obra dentro da pasta do contrato para salvar os arquivos, se não existir cria uma
     caminho_pasta_obra = os.path.join(caminho_pasta_contrato, obra.nome)
 
     verificar_ou_criar_pasta(caminho_pasta_obra)
-    
+    sleep(0.5)
     # Verifica se existe uma pasta do diário, dentro da pasta da obra, dentro da pasta do contrato para salvar os arquivos, se não existir cria uma
 
     caminho_pasta_diario = os.path.join(caminho_pasta_obra, f"{diario.data.year}.{diario.data.month:02}.{diario.data.day:02}")
 
     verificar_ou_criar_pasta(caminho_pasta_diario)
-    
+    sleep(0.5)
     # Inicia o processo de salvamento dos arquivos dentro da pasta do diario
 
     for index, arquivo in enumerate(arquivos):
@@ -124,19 +125,50 @@ def apagar_foto(foto):
             sleep(1)
             st.rerun()
 
+@st.dialog("Apagar Serviço")
+def apagar_servico(servico):
+    '''Remove o serviço fornecido, apagando o registro do banco de dados
+    
+    :param servico: Objeto Serviço, objeto instanciado de Serviço, contendo os dados do serviço escolhido
+    :return: mensagem de aviso sobre ter ou não concluído o processo e finaliza a janela'''
 
-# def backup_bd():
+    st.warning("Deseja mesmo apagar este serviço? Essa ação não poderá ser desfeita")
+    st.write(f"Serviço: {servico.descricao} / Referência: {servico.referencia}")
+    col_cancelar, col_apagar = st.columns(2)
+    with col_cancelar:
+        if st.button("Não"):
+            st.error("Processo Cancelado")
+            sleep(1)
+            st.rerun()
+    
+    with col_apagar:
+        if st.button("Sim"):
+            session.delete(servico)
+            session.commit()
+            st.success("Serviço removido com sucesso")
+            sleep(1)
+            st.rerun()
 
-#     caminho_banco_dados = 'registro_obras.sqlite'
-#     pasta_backup_google_drive = config['pasta_backup']
-#     # Cria um nome de backup com data e hora
-#     data_hora = datetime.now().strftime("%Y%m%d_%H%M%S")
-#     nome_backup = f"backup_{data_hora}.sqlite"
-#     caminho_backup = os.path.join(pasta_backup_google_drive, nome_backup)
+@st.dialog("Apagar Função")
+def apagar_funcao(funcao):
+    '''Remove a função direta fornecida, apagando o registro do banco de dados
+    
+    :param funcao_direta: Objeto Funcao_Direta, objeto instanciado de Funcao_Direta, contendo os dados da função escolhida
+    :return: mensagem de aviso sobre ter ou não concluído o processo e finaliza a janela'''
 
-#     try:
-#         # Copia o banco de dados para a pasta de backup
-#         shutil.copy(caminho_banco_dados, caminho_backup)
-#         st.toast(f"Backup criado com sucesso")
-#     except Exception as e:
-#         st.toast(f"Erro ao criar backup: {e}")
+    st.warning("Deseja mesmo apagar esta função? Essa ação não poderá ser desfeita")
+    st.write(funcao)
+    col_cancelar, col_apagar = st.columns(2)
+    with col_cancelar:
+        if st.button("Não"):
+            st.error("Processo Cancelado")
+            sleep(1)
+            st.rerun()
+    
+    with col_apagar:
+        if st.button("Sim"):
+            session.delete(funcao)
+            session.commit()
+            st.success("Função removida com sucesso")
+            sleep(1)
+            st.rerun()

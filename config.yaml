@@ -16,5 +16,22 @@ credentials:
       logged_in: false
       name: Renato Rodrigues
       password: $2b$12$9XcNe/cazs6RGaP5gStNZutHKU6LpWk85Vsiziqgsq.7vpPQr.Sku
+efetivo_direto:
+  AUX. DE TOPOGRAFIA:
+    presente: 2
+    qtde: 2
+  LABORATORISTA:
+    presente: 2
+    qtde: 2
+  TOPOGRAFO:
+    presente: 1
+    qtde: 1
+efetivo_indireto:
+  ENG. DE PLAN. E PROJETOS:
+    qtde: 2
+  ENGENHEIRO RESIDENTE:
+    qtde: 36
+  ENGENHEIRO SUPERVISOR:
+    qtde: 1
+pasta_fotos: G:\Meu Drive
 
-pasta_fotos: G:\Meu Drive\fotos_obras

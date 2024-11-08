@@ -1,6 +1,12 @@
-from sqlalchemy import create_engine, Column, Integer, String, Date, ForeignKey, Boolean
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from datetime import datetime
+from sqlalchemy import create_engine, Column, Integer, String, Date, ForeignKey, Boolean, DateTime
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+import pytz
+
+# Função para obter a data e hora atual com o fuso horário de São Paulo
+def data_emissao_sao_paulo():
+    fuso_sao_paulo = pytz.timezone('America/Sao_Paulo')
+    return datetime.now(fuso_sao_paulo)
 
 # Criar o engine do banco de dados SQLite
 engine = create_engine('sqlite:///registro_obras.sqlite')
@@ -11,11 +17,14 @@ Base = declarative_base()
 # Tabela Contrato
 class Contrato(Base):
     __tablename__ = 'contratos'
-    numero = Column(String(50), primary_key=True)          # Número único do contrato
-    nome = Column(String(255), nullable=False)          # Nome do contrato
-    cliente = Column(String(255), nullable=False)       # Nome do cliente
-    ativo = Column(Boolean, nullable=False)             # Marca se o contrato está ativo ou não
-
+    numero = Column(String(50), primary_key=True)           # Número único do contrato
+    nome = Column(String(255), nullable=False)              # Nome do contrato
+    cliente = Column(String(255), nullable=False)           # Nome do cliente
+    dia_inicia_relatorio = Column(Integer, nullable=False)  # Dia em que inicia o relatório de diários de obra
+    dia_finaliza_relatorio = Column(Integer, nullable=False) # Dia do mês subsequente que finaliza o relatório de diários de obra
+    ativo = Column(Boolean, nullable=False)                 # Marca se o contrato está ativo ou não
+    created_at = Column(DateTime, default=data_emissao_sao_paulo)
+    usuario_criador = Column(String(100), nullable=False)
     # Relacionamento com Obras (uma relação contrato -> várias obras)
     obras = relationship('Obra', back_populates='contrato')
 
@@ -32,6 +41,8 @@ class Obra(Base):
     termino = Column(Date, nullable=False)               # Prazo de conclusão da obra
     ativo = Column(Boolean, nullable=False)              # Marca se a obra ainda está ativa ou foi encerrada    
     contrato_numero = Column(Integer, ForeignKey('contratos.numero'))  # Chave estrangeira para contrato
+    created_at = Column(DateTime, default=data_emissao_sao_paulo)
+    usuario_criador = Column(String(100), nullable=False)
 
     # Relacionamento com o contrato (muitas obras -> um contrato)
     contrato = relationship('Contrato', back_populates='obras')
@@ -51,8 +62,11 @@ class Diario(Base):
     clima_manha = Column(String(50), nullable=True)
     clima_tarde = Column(String(50), nullable=True)
     clima_noite = Column(String(50), nullable=True)
+    clima_madrugada = Column(String(50), nullable=True)
     observacoes = Column(String(255), nullable=True)
     obra_id = Column(Integer, ForeignKey('obra.id'), nullable=False)
+    created_at = Column(DateTime, default=data_emissao_sao_paulo)
+    usuario_criador = Column(String(100), nullable=False)
 
     # Relacionamento com Obra (muitos diários -> uma obra)
     obra = relationship('Obra', back_populates='diarios')
@@ -69,17 +83,23 @@ class Diario(Base):
     # Relacionamento com Efetivo Indireto (um diário -> várias funções)
     efetivo_indireto = relationship('Efetivo_Indireto', back_populates='diario', cascade="all, delete-orphan")
 
+    def __str__(self):
+        return f"{self.obra.contrato.nome} - {self.obra.nome} / DIÁRIO {self.id} de {self.data}"
+
 # Tabela Servicos
 class Servicos(Base):
     __tablename__ = 'servicos'
     id = Column(Integer, primary_key=True)
-    descricao = Column(String(255), nullable=False)
+    servicos_padrao_id = Column(Integer, ForeignKey('servicos_padrao.id'), nullable=False)  # FK para Servicos_Padrao
     item = Column(Integer, nullable=False)
     referencia = Column(String(255), nullable=False)
     diario_id = Column(Integer, ForeignKey('diario.id'))
 
     # Relacionamento com Diário (muitos servicos -> um diário)
     diario = relationship('Diario', back_populates='servicos')
+
+    # Relacionamento com Serviços_Padrao
+    servicos_padrao = relationship('Servicos_Padrao', back_populates='servicos')
 
 # Tabela Efetivo Direto
 class Efetivo_Direto(Base):
@@ -91,6 +111,9 @@ class Efetivo_Direto(Base):
     diario_id = Column(Integer, ForeignKey('diario.id'))
     diario = relationship("Diario", back_populates="efetivo_direto")
 
+    def __str__(self):
+        return f"Função Direta: {self.funcao} | Qtde: {self.qtde} | Presente:{self.presente}"
+
 # Tabela Efetivo Indireto
 class Efetivo_Indireto(Base):
     __tablename__='efetivo_indireto'
@@ -99,6 +122,9 @@ class Efetivo_Indireto(Base):
     efetivo = Column(Integer, nullable=False)
     diario_id = Column(Integer, ForeignKey('diario.id'))
     diario = relationship("Diario", back_populates="efetivo_indireto")
+
+    def __str__(self):
+        return f"Função Indireta: {self.funcao} | Efetivo: {self.efetivo}"
 
 # Tabela Foto
 class Foto(Base):
@@ -109,6 +135,18 @@ class Foto(Base):
 
     # Relacionamento com Diário (muitas fotos -> um diário)
     diario = relationship('Diario', back_populates='fotos')
+
+# Tabela Servicos_Padrao
+class Servicos_Padrao(Base):
+    __tablename__ = 'servicos_padrao'
+    id = Column(Integer, primary_key=True)
+    descricao = Column(String(255), nullable=False)
+
+    # Relacionamento com Servicos (um Servicos_Padrao -> muitos Servicos)
+    servicos = relationship('Servicos', back_populates='servicos_padrao')
+
+    def __str__(self):
+        return f"{self.descricao}"
 
 # Criar todas as tabelas no banco de dados
 Base.metadata.create_all(engine)

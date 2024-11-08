@@ -11,9 +11,19 @@ def cad_contrato():
 
         numero = st.text_input("Número do Contrato").upper()
 
-        nome = st.text_input("Nome do contrato").upper()
+        nome = st.text_input("Nome do contrato").upper().strip()
 
-        cliente = st.text_input("Cliente").upper()
+        cliente = st.text_input("Cliente").upper().strip()
+
+        st.divider()
+
+        st.write("Informe abaixo os dias que marcam o período do relatório final")
+        col_inicio, col_final = st.columns(2)
+
+
+        dia_inicial = col_inicio.number_input("Dia Inicial", min_value=1, max_value=31, step=1)
+
+        dia_final = col_final.number_input("Dia Final", min_value=1, max_value=31, step=1)
 
         gravar = st.form_submit_button("Gravar")
 
@@ -22,7 +32,7 @@ def cad_contrato():
             problema = False
 
             '''Verifica se todos os campos foram preenchidos'''
-            if not numero or not nome or not cliente:
+            if not numero or not nome or not cliente or not dia_inicial or not dia_final:
                 st.error("Todos os campos devem ser preenchidos")
                 problema = True
             
@@ -37,7 +47,8 @@ def cad_contrato():
             
             '''Se não houver nenhum problema, realiza o cadastro'''
             if not problema:
-                contrato = Contrato(ativo=True, numero=numero, nome=nome, cliente=cliente)
+                contrato = Contrato(ativo=True, numero=numero, nome=nome, cliente=cliente, usuario_criador=st.session_state['name'], 
+                dia_inicia_relatorio=dia_inicial, dia_finaliza_relatorio=dia_final)
                 session.add(contrato)
                 session.commit()
                 st.success(f"Contrato: {contrato} foi adicionado com sucesso.")
@@ -60,15 +71,25 @@ def edit_contrato():
            
             st.title("Edição de Contratos")
             st.divider()
-
+            st.caption(f"Criado por {contrato_pra_editar.usuario_criador} em {contrato_pra_editar.created_at.strftime('%d/%m/%Y %H:%M:%S')}")
             # Determina a situação com base no estado atual do contrato
             situacao = 'Marque aqui para desativar esse contrato' if contrato_pra_editar.ativo else 'Marque aqui para ativar esse contrato'
             ativo_editado = st.checkbox(situacao, contrato_pra_editar.ativo, help="Ao deixar essa opção marcada, este contrato pode ter mais obras cadastradas e pode ter diários registrados.")
 
             numero = st.text_input("Número do Contrato", value=contrato_pra_editar.numero, disabled=True).upper()
-            nome_editado = st.text_input("Nome do contrato", value=contrato_pra_editar.nome).upper()
-            cliente_editado = st.text_input("Cliente", value=contrato_pra_editar.cliente).upper()
+            nome_editado = st.text_input("Nome do contrato", value=contrato_pra_editar.nome).upper().strip()
+            cliente_editado = st.text_input("Cliente", value=contrato_pra_editar.cliente).upper().strip()
 
+            st.divider()
+            
+            st.write("Informe abaixo os dias que marcam o período do relatório final")
+
+            col_inicio, col_final = st.columns(2)
+
+            dia_inicial_editado = col_inicio.number_input("Dia Inicial", min_value=1, max_value=31, step=1, value=contrato_pra_editar.dia_inicia_relatorio)
+
+            dia_final_editado = col_final.number_input("Dia Final", min_value=1, max_value=31, step=1, value=contrato_pra_editar.dia_finaliza_relatorio)
+            
             gravar = st.form_submit_button("Gravar")
 
             if gravar:
@@ -78,13 +99,15 @@ def edit_contrato():
                 campos_alterados = (
                     ativo_editado != contrato_pra_editar.ativo or
                     nome_editado != contrato_pra_editar.nome.upper() or
-                    cliente_editado != contrato_pra_editar.cliente.upper()
+                    cliente_editado != contrato_pra_editar.cliente.upper() or
+                    dia_inicial_editado != contrato_pra_editar.dia_inicia_relatorio or
+                    dia_final_editado != contrato_pra_editar.dia_finaliza_relatorio
                 )
 
                 # Executa as verificações somente se houver alterações
                 if campos_alterados:
                     # Verifica se todos os campos foram preenchidos
-                    if not nome_editado or not cliente_editado:
+                    if not nome_editado or not cliente_editado or not dia_inicial_editado or not dia_final_editado:
                         st.error("Todos os campos devem ser preenchidos")
                         problema = True
 
@@ -98,6 +121,8 @@ def edit_contrato():
                         contrato_pra_editar.ativo = ativo_editado
                         contrato_pra_editar.nome = nome_editado
                         contrato_pra_editar.cliente = cliente_editado
+                        contrato_pra_editar.dia_inicia_relatorio = dia_inicial_editado
+                        contrato_pra_editar.dia_finaliza_relatorio = dia_final_editado
                         session.commit()
                         st.success(f"Contrato: {contrato_pra_editar} foi alterado com sucesso.")
                 else:
@@ -114,9 +139,9 @@ def cad_obra():
 
             st.divider()
 
-            nome_obra = st.text_input("Nome da Obra").upper()
+            nome_obra = st.text_input("Nome da Obra").upper().strip()
 
-            local = st.text_input("Local da Obra").upper()
+            local = st.text_input("Local da Obra").upper().strip()
 
             data_inicio = st.date_input("Data de Início", format="DD/MM/YYYY", value=datetime.today())
 
@@ -149,7 +174,9 @@ def cad_obra():
                     problema = True
 
                 if problema == False:
-                    nova_obra = Obra(ativo=True, nome=nome_obra, local=local, inicio=data_inicio, termino=data_termino, contrato_numero=contratos_opcoes[contrato_id])
+                    nova_obra = Obra(ativo=True, nome=nome_obra, local=local, inicio=data_inicio, 
+                                    termino=data_termino, contrato_numero=contratos_opcoes[contrato_id],
+                                    usuario_criador=st.session_state['name'])
                     session.add(nova_obra)
                     session.commit()
                     contrato_da_obra = session.query(Contrato).filter_by(numero=nova_obra.contrato_numero).first()
@@ -183,13 +210,13 @@ def edit_obra():
 
             st.title("Edição de Obras")
             st.divider()
-
+            st.caption(f"Criado por {obra_pra_editar.usuario_criador} em {obra_pra_editar.created_at.strftime('%d/%m/%Y %H:%M:%S')}")
             # Determina a situação com base no estado atual da obra
             situacao = 'Marque aqui para desativar essa obra' if obra_pra_editar.ativo else 'Marque aqui para ativar essa obra'
             ativo_editado = st.checkbox(situacao, obra_pra_editar.ativo, help="Ao deixar essa opção marcada, essa obra pode ter diários registrados.")
 
-            nome_obra_editado = st.text_input("Nome da Obra", value=obra_pra_editar.nome).upper()
-            local_editado = st.text_input("Local da Obra", value=obra_pra_editar.local).upper()
+            nome_obra_editado = st.text_input("Nome da Obra", value=obra_pra_editar.nome).upper().strip()
+            local_editado = st.text_input("Local da Obra", value=obra_pra_editar.local).upper().strip()
             data_inicio_editado = st.date_input("Data de Início", value=obra_pra_editar.inicio)
             data_termino_editado = st.date_input("Data de Término", value=obra_pra_editar.termino)
             

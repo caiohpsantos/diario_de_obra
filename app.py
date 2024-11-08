@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit_authenticator as stauth
 from streamlit_option_menu import option_menu
 from models import session
-from forms import cadastros, diario, configuracoes
+from forms import cadastros, diario, configuracoes, relatorios
 
 
 st.set_page_config(layout="wide")
@@ -63,9 +63,18 @@ if st.session_state['authentication_status']:
                 case "Editar Diário":
                     diario.edita_diario()
 
+        case "Relatório":
+
+            menu_secundario = option_menu("Relatórios", ["Individual", "Em Lotes"], orientation="horizontal")
+
+            match menu_secundario:
+
+                case "Individual":
+                    relatorios.relatorio_individual()
+
         case "Configurações":
 
-            menu_secundario = option_menu("Configurações", ["Alterar Senha", "Armazenamento"], orientation="horizontal")
+            menu_secundario = option_menu("Configurações", ["Alterar Senha", "Armazenamento", "Efetivo Padrão", "Serviços Padrão"], orientation="horizontal")
 
             match menu_secundario:
 
@@ -91,3 +100,15 @@ if st.session_state['authentication_status']:
 
                 case "Armazenamento":
                     configuracoes.armazenamento()
+
+                case "Efetivo Padrão":
+                    configuracoes.efetivo_padrao()
+                
+                case "Serviços Padrão":
+                    configuracoes.servicos_padrao()
+
+elif st.session_state['authentication_status'] is False:
+    st.error('Usuário ou senha incorretos')
+
+elif st.session_state['authentication_status'] is None:
+    st.warning('Digite seu usuário e senha para entrar')
