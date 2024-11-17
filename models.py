@@ -112,7 +112,7 @@ class Efetivo_Direto(Base):
     diario = relationship("Diario", back_populates="efetivo_direto")
 
     def __str__(self):
-        return f"Função Direta: {self.funcao} | Qtde: {self.qtde} | Presente:{self.presente}"
+        return f"{self.funcao} | Qtde: {self.qtde} | Presente:{self.presente}"
 
 # Tabela Efetivo Indireto
 class Efetivo_Indireto(Base):
@@ -124,7 +124,7 @@ class Efetivo_Indireto(Base):
     diario = relationship("Diario", back_populates="efetivo_indireto")
 
     def __str__(self):
-        return f"Função Indireta: {self.funcao} | Efetivo: {self.efetivo}"
+        return f"{self.funcao} | Efetivo: {self.efetivo}"
 
 # Tabela Foto
 class Foto(Base):

@@ -1,7 +1,10 @@
+import io
 import os
 import yaml
 import re
 import shutil
+from fpdf import FPDF
+from fpdf.fonts import FontFace
 from time import sleep
 from yaml import SafeLoader
 from datetime import datetime
@@ -9,9 +12,24 @@ import streamlit as st
 from models import session, Contrato, Obra, Foto
 from sqlalchemy import func
 
+#Abre arquivo de configurações
 with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
 
+#Funções que lidam com datas
+def dia_da_semana(data):
+    """
+    Retorna o dia da semana correspondente a uma data.
+
+    :param data: Uma string no formato 'DD/MM/AAAA'
+    :return: Nome do dia da semana (em português)
+    """
+    dias_semana = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']
+    
+    # Retorna o nome do dia da semana correspondente
+    return dias_semana[data.weekday()]
+
+#Funções que lidam com a criação de pastas e gravação das fotos dos diários
 def sanitizar_caminho_pasta(caminho_pasta):
     """
     Sanitiza o caminho da pasta, substituindo caracteres não permitidos.
@@ -99,6 +117,7 @@ def salvar_fotos_na_pasta(contrato, obra, diario, arquivos):
                 print(f"Erro ao salvar o arquivo {arquivo}: {e}")
     return caminho_arquivos
 
+#Funções que geram os modal (cxs de texto flutuante) para lidar com as remoções dos diários gravados (serviços, funções e fotos)
 @st.dialog("Apagar Foto")
 def apagar_foto(foto):
     '''Remove a foto fornecida, apagando primeiro o arquivo e depois o registro do banco de dados
@@ -172,3 +191,291 @@ def apagar_funcao(funcao):
             st.success("Função removida com sucesso")
             sleep(1)
             st.rerun()
+
+#Funções que lidam com o relatório mensal
+
+class PDF(FPDF):
+    def footer(self):
+        # Position cursor at 1.5 cm from bottom:
+        self.set_y(-2)
+        # Setting font: helvetica italic 8
+        self.set_font("helvetica", "B", 10)
+        # Printing page number:
+        self.cell(w=0, h=1, txt=f"Página {self.page_no()}", align="C")
+    
+    def desenhar_margens(self):
+        # Define as bordas ao redor do documento
+        margin = 1  # Tamanho da margem
+        page_width = self.w - 2 * margin  # Largura da página sem margem
+        page_height = self.h - 2 * margin  # Altura da página sem margem
+
+        # Desenha um retângulo ao redor das bordas, com a espessura de linha desejada
+        self.set_line_width(0.05)
+        self.rect(margin, margin, page_width, page_height)
+
+def gera_relatorios(diarios):
+    
+    pdf = PDF(unit="cm")
+    
+    #laço de repetição para criar as páginas de cada diário enviado
+    for diario in diarios:
+        pdf.add_page()
+        #Cria as bordas do documento usando a função 
+        pdf.desenhar_margens()
+        
+        #Insere a imagem da Rudra na página e depois cria a célula para rodeá-la
+        pdf.image('images\\rudra.png',x=1.6, y=1.02, w=1, keep_aspect_ratio=True)
+        pdf.set_font('helvetica', size=16)
+        pdf.cell(2.5,1.3,border=True, new_x='LMARGIN')
+        
+        #Adiciona o título do relatório ao lado da célula da rudra
+        pdf.cell(0,1.3,border=True, text="RELATÓRIO INTERNO DE ACOMPANHAMENTO DE OBRAS", align="R", new_x='LMARGIN', new_y='NEXT')
+        
+        #Muda o tamanho da fonte para 10 e põe em negrito, acrescenta um fundo cinza para a célula
+        pdf.set_font('helvetica', "B", size=10)
+        pdf.set_fill_color(200, 200, 200) #cor cinza para os enunciados
+        #Cria a linha que especifica contrato/obra
+        pdf.cell(3.16,0.5,"Obra: ", border=True, align="R",fill=True)
+        pdf.cell(15.84,0.5, f"{diario.obra.contrato.nome} - {diario.obra.nome}", new_x='LMARGIN', new_y='NEXT', border=True)
+
+        #Cria a linha que especifica o cliente
+        pdf.cell(3.16,0.5,"Cliente: ", border=True, align="R",fill=True)
+        pdf.cell(15.84,0.5,diario.obra.contrato.cliente, new_x='LMARGIN', new_y='NEXT', border=True)
+
+        #Cria a linha que especifica o local
+        pdf.cell(3.16,0.5,"Local: ", border=True, align="R",fill=True)
+        pdf.cell(15.84,0.5,diario.obra.local, new_x='LMARGIN', new_y='NEXT', border=True)
+
+        pdf.cell(h=0.2, w=0,new_x='LMARGIN', new_y='NEXT',text='') #linha em branco para separação
+
+        #Cria a linha que especifica início e término da obra
+        pdf.cell(5.5,0.5,"Início da Obra: ", border=True, align="R", fill=True)
+        pdf.set_font('helvetica', size=8)
+        pdf.cell(4,0.5,f"{diario.obra.inicio.strftime("%d/%m/%Y")}", border=True, align='C')
+        pdf.set_font('helvetica', "B", size=10)
+        pdf.cell(5.5,0.5,"Término da Obra: ", border=True, align="R", fill=True)
+        pdf.set_font('helvetica', size=8)
+        pdf.cell(4,0.5,f"{diario.obra.termino.strftime("%d/%m/%Y")}", align='C', new_x='LMARGIN', new_y='NEXT', border=True)
+        
+        #Cria a linha que contabiliza os dias
+        
+        #Cria o Prazo da Obra
+        prazo = (diario.obra.termino - diario.obra.inicio).days
+        pdf.set_font('helvetica', "B", size=10)
+        pdf.cell(3.16,0.7,"Prazo da Obra: ", border=True, align="R", fill=True)
+        pdf.set_font('helvetica', size=8)
+        pdf.cell(3.16,0.7,f"{prazo} dias", border=True, align="C")
+        
+        #Cria o Tempo decorrido
+        tempo_decorrido = (diario.data - diario.obra.inicio).days
+        pdf.set_font('helvetica', "B", size=10)
+        pdf.cell(3.32,0.7,"Tempo Decorrido: ", border=True, align="R", fill=True)
+        pdf.set_font('helvetica', size=8)
+        pdf.cell(3,0.7,f"{tempo_decorrido} dias", border=True, align="C")
+        
+        #Cria o saldo de prazo
+        saldo_prazo = (diario.obra.termino - diario.data).days
+        pdf.set_font('helvetica', "B", size=10)
+        pdf.cell(3.16,0.7,"Saldo de Prazo: ", border=True, align="R", fill=True)
+        pdf.set_font('helvetica', size=8)
+        pdf.cell(3.16,0.7,f"{saldo_prazo} dias", border=True, align="C", new_x='LMARGIN', new_y='NEXT')
+        pdf.cell(h=0.2, w=0,new_x='LMARGIN', new_y='NEXT',text='') #linha em branco
+        
+        #Cria a linha com a data que o diario foi registrado e que dia da semana é
+        
+        #Cria os campos de data atual
+        pdf.set_font('helvetica', "B", size=10)
+        pdf.cell(3.16,0.7,"Data: ", border=True, align="R", fill=True)
+        pdf.set_font('helvetica', size=8)
+        pdf.cell(3.16,0.7,f"{diario.data.strftime("%d/%m/%Y")}", border=True, align="C")
+        
+        #Cria as colunas de dia da semana e muda a cor caso seja o dia da semana correspondente
+        pdf.set_font('helvetica', "B", size=10)
+        pdf.cell(6.32,0.7,"Dia da Semana: ", border=True, align="R", fill=True)
+        
+        #Descobre qual dia da semana é a data do diario
+        dia_semana = dia_da_semana(diario.data)
+        #Troca o fundo da célula pra verde claro para realçar o dia da semana correspondente à data do diário
+        pdf.set_fill_color(146,208,80)
+
+        #Cria os dias da semana
+        pdf.set_font('helvetica', 'B', size=8)
+        pdf.cell(0.9028, 0.7, 'Seg',fill=True if dia_semana == "segunda" else False, border=True, align="C")
+        pdf.cell(0.9028, 0.7, "Ter",fill=True if dia_semana == "terca" else False, border=True, align="C")
+        pdf.cell(0.9028, 0.7, "Qua",fill=True if dia_semana == "quarta" else False, border=True, align="C")
+        pdf.cell(0.9028, 0.7, "Qui",fill=True if dia_semana == "quinta" else False, border=True, align="C")
+        pdf.cell(0.9028, 0.7, "Sex",fill=True if dia_semana == "sexta" else False, border=True, align="C")
+        pdf.cell(0.9028, 0.7, "Sáb",fill=True if dia_semana == "sabado" else False, border=True, align="C")
+        pdf.cell(0.9028, 0.7, "Dom", new_x='LMARGIN', new_y='NEXT',fill=True if dia_semana == "domingo" else False, border=True, align="C")
+        
+        pdf.cell(h=0.2, w=0,new_x='LMARGIN', new_y='NEXT',text='') #linha em branco
+
+        #retorna a cor de fundo pra cinza para os próximos enunciados manterem o padrão
+        pdf.set_fill_color(200, 200, 200)
+        
+        #Cria as coluna de turno e tempo
+        pdf.set_font('helvetica', "B", size=10)
+        pdf.cell(0,0.5,"Turno/Tempo", align="C", border=True, fill=True, new_x='LMARGIN', new_y='NEXT')
+
+        pdf.cell(h=0.1, w=0,new_x='LMARGIN', new_y='NEXT',text='') #linha em branco
+        
+        #Linha das imagens do tempo
+        pdf.image('images\\clima-relatorio.jpeg',w=19, keep_aspect_ratio=True)
+        
+        #Linha da manhã
+        pdf.cell(5,0.5,"Manhã", align="C", border=True, fill=True)
+        #Troca o fundo da célula pra verde claro para realçar o clima registrado para aquele turno de serviço
+        pdf.set_fill_color(146,208,80)
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_manha == "Limpo" else False)#Limpo
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_manha == "Nublado" else False)#Nublado
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_manha == "Chuva" else False)#Chuva
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_manha == "Impraticável" else False
+        ,new_x='LMARGIN', new_y='NEXT')#Impraticável
+
+        #Linha da tarde
+        #retorna a cor de fundo pra cinza para os próximos enunciados manterem o padrão
+        pdf.set_fill_color(200, 200, 200)
+        pdf.cell(5,0.5,"Tarde", align="C", border=True, fill=True)
+        #Troca o fundo da célula pra verde claro para realçar o clima registrado para aquele turno de serviço
+        pdf.set_fill_color(146,208,80)
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_tarde == "Limpo" else False)#Limpo
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_tarde == "Nublado" else False)#Nublado
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_tarde == "Chuva" else False)#Chuva
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_tarde == "Impraticável" else False
+        ,new_x='LMARGIN', new_y='NEXT')#Impraticável
+
+        #Linha da noite
+        #retorna a cor de fundo pra cinza para os próximos enunciados manterem o padrão
+        pdf.set_fill_color(200, 200, 200)
+        pdf.cell(5,0.5,"Noite", align="C", border=True, fill=True)
+         #Troca o fundo da célula pra verde claro para realçar o clima registrado para aquele turno de serviço
+        pdf.set_fill_color(146,208,80)
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_noite == "Limpo" else False)#Limpo
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_noite == "Nublado" else False)#Nublado
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_noite == "Chuva" else False)#Chuva
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_noite == "Impraticável" else False
+        ,new_x='LMARGIN', new_y='NEXT')#Impraticável
+
+        #Linha da madrugada
+        #retorna a cor de fundo pra cinza para os próximos enunciados manterem o padrão
+        pdf.set_fill_color(200, 200, 200)
+        pdf.cell(5,0.5,"Madrugada", align="C", border=True, fill=True)
+        #Troca o fundo da célula pra verde claro para realçar o clima registrado para aquele turno de serviço
+        pdf.set_fill_color(146,208,80)
+        pdf.cell(3.48,0.5,"", align="C", border=True)#Limpo
+        pdf.cell(3.48,0.5,"", align="C", border=True)#Nublado
+        pdf.cell(3.48,0.5,"", align="C", border=True)#Chuva
+        pdf.cell(3.48,0.5,"", align="C", border=True,new_x='LMARGIN', new_y='NEXT')#Impraticável
+
+        pdf.cell(h=0.2, w=0,new_x='LMARGIN', new_y='NEXT',text='') #linha em branco
+
+        #Cria a tabela produção diária
+        #Cria os cabeçalhos
+        pdf.set_fill_color(200, 200, 200)
+        pdf.cell(0,0.5,"Produção Diária", fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT')
+        pdf.cell(8.5,0.5,"Descrição dos Serviços", fill=True, align="C", border=True)
+        pdf.cell(2,0.5,"Item",fill=True, align="C", border=True)
+        pdf.cell(8.5,0.5,"Referência", fill=True, align="C", border=True,new_x='LMARGIN', new_y='NEXT')
+
+        #Preenche a tabela com os serviços cadastrados
+        pdf.set_fill_color("#FFFFFF")
+        pdf.set_font('',size=8)
+        dados_servico = []
+        for servico in diario.servicos:
+            servico_da_vez = [f"{servico.servicos_padrao.descricao}",f"{servico.item}", f"{servico.referencia}"]
+            dados_servico.append(servico_da_vez)
+        # Garante que a tabela tenha 14 linhas, adicionando linhas vazias se necessário
+        total_linhas = 14
+        linhas_vazias = total_linhas - len(dados_servico)
+        for _ in range(linhas_vazias):
+            dados_servico.append(["", "", ""])  # Adiciona uma linha vazia com três colunas
+        #Cria a tabela usando table do FPDF
+        with pdf.table(text_align="CENTER", col_widths=(8.5,2,8.5), first_row_as_headings=False) as table:
+            for linha_tabela in dados_servico:
+                linha = table.row()
+                for dados in linha_tabela:
+                    linha.cell(dados)
+        
+        pdf.cell(h=0.2, w=0,new_x='LMARGIN', new_y='NEXT',text='') #linha em branco
+
+        #Cria a tabela de funções diretas e indiretas
+        pdf.set_fill_color(200, 200, 200)
+        pdf.set_font(style="B", size=10)
+        pdf.cell(0,0.5,"Efetivo Alocado", fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT')
+        pdf.cell(12,0.5, "Mão de Obra Direta", fill=True, align="C", border=True)
+        pdf.cell(7,0.5, "Mão de Obra Indireta", fill=True, align="C", border=True,new_x='LMARGIN', new_y='NEXT')
+        #Função, Quantidade, Presente, Ausente, Efetivo    Descrição, Efetivo
+        pdf.set_font(style="B", size=8)
+        pdf.cell(5,0.5, "Função", fill=True, align="C", border=True)
+        pdf.cell(2,0.5, "Quantidade", fill=True, align="C", border=True)
+        pdf.cell(1.5,0.5, "Presente", fill=True, align="C", border=True)
+        pdf.cell(1.5,0.5, "Ausente", fill=True, align="C", border=True)
+        pdf.cell(2,0.5, "Efetivo", fill=True, align="C", border=True)
+        pdf.cell(5,0.5, "Descrição", fill=True, align="C", border=True)
+        pdf.cell(2,0.5, "Efetivo", fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT')
+        #Dados da tabela
+        #Inicia a montagem das tabelas, elas serão montadas ao mesmo tempo, lado a lado
+        
+        pdf.set_font(style='')
+        pdf.set_fill_color(255,255,255)
+        for funcao_direta, funcao_indireta in zip(diario.efetivo_direto, diario.efetivo_indireto):
+            pdf.cell(5,0.5, funcao_direta.funcao, fill=True, align="C", border=True)
+            pdf.cell(2,0.5, f"{funcao_direta.qtde}", fill=True, align="C", border=True)
+            pdf.cell(1.5,0.5, f"{funcao_direta.presente}", fill=True, align="C", border=True)
+            pdf.cell(1.5,0.5, f"{funcao_direta.qtde - funcao_direta.presente}", fill=True, align="C", border=True)
+            pdf.cell(2,0.5, f"{funcao_direta.presente}", fill=True, align="C", border=True)
+            pdf.cell(5,0.5, funcao_indireta.funcao, fill=True, align="C", border=True)
+            pdf.cell(2,0.5, f"{funcao_indireta.efetivo}", fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT')
+        
+        pdf.cell(h=0.2, w=0,new_x='LMARGIN', new_y='NEXT',text='') #linha em branco
+
+        #Campo de observações
+        pdf.set_font(style="B", size=10)
+        pdf.set_fill_color(200,200,200)
+        pdf.cell(0,0.7,"Observações", fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT')
+        pdf.set_fill_color(255,255,255)
+        pdf.cell(0,3.9,diario.observacoes, fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT')
+
+        # Configurações iniciais do cabeçalho
+        pdf.set_font(style="B", size=14)
+        pdf.set_fill_color(255, 255, 255)
+        pdf.cell(
+            0, 0.7, f"RELATÓRIO FOTOGRÁFICO {diario.data.strftime('%d/%m/%Y')}",
+            fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT'
+        )
+
+        # Configurações gerais
+        col_width = pdf.epw / 2  # Divide a largura da página em 2 colunas
+        row_height = (pdf.h - pdf.t_margin - pdf.b_margin) / 4  # Divide o espaço restante em 4 linhas
+        images_per_page = 8  # Total de imagens por página
+
+        # Divide as fotos em grupos de 8 para cada página
+        grupos_fotos = [diario.fotos[i:i + images_per_page] for i in range(0, len(diario.fotos), images_per_page)]
+
+        # Itera sobre os grupos de fotos para criar páginas
+        for grupo in grupos_fotos:
+            with pdf.table(
+                col_widths=[col_width] * 2,  # Duas colunas de largura igual
+                line_height=row_height,
+                text_align="CENTER",
+                first_row_as_headings=False,
+                borders_layout="NONE"
+            ) as table:
+                for i in range(0, len(grupo), 2):  # Adiciona fotos em pares (2 por linha)
+                    linha = table.row()
+                    for foto in grupo[i:i + 2]:  # Garante que não exceda o número de colunas
+                        linha.cell(img=foto.caminho_arquivo)
+
+        # Posiciona a imagem final no rodapé, se necessário
+        altura = 1
+        largura = 12
+        y_pos = pdf.h - pdf.b_margin - altura  # Altura total - margem inferior - altura da imagem
+        x_pos = (pdf.w - largura) / 2  # Centraliza a imagem horizontalmente
+
+        pdf.image('images\\campo_assinatura.png', x=x_pos, y=y_pos, w=largura, keep_aspect_ratio=True)
+        
+    pdf_temporario = io.BytesIO()
+    pdf.output(pdf_temporario)
+    pdf_temporario.seek(0)
+    return pdf_temporario
+            

@@ -419,7 +419,7 @@ def edita_diario():
                         # Dicionário para armazenar a produção
                         producao = {}
 
-                        #Consulta todos os serviços padrão e pra montar as opções do selectbox
+                        #Consulta todos os serviços padrão pra montar as opções do selectbox
                         opcoes_servicos = {servico.descricao: servico.id for servico in session.query(Servicos_Padrao).order_by(Servicos_Padrao.descricao).all()}
 
                         # Cria campos de entrada de acordo com o número selecionado no slider
@@ -443,37 +443,40 @@ def edita_diario():
 
                                     # Exibe o selectbox com o índice da opção correta
                                     servico_selecionado = st.selectbox(
-                                        f"Descrição do Serviço {i + 1}",
+                                        f"Descrição do Serviço {i + 1} (Cadastrado)",
                                         options=list(opcoes_servicos.keys()),
-                                        key=f"descricao_do_servico_{i}",
+                                        key=f"descricao_do_servico_existente{i + 1}",
                                         index=index_servico
                                     )
                                     servico_selecionado_id = opcoes_servicos[servico_selecionado]  # Obtém o id do serviço selecionado
 
                                 with col_referencia:
-                                    referencia = st.text_input(f"Referência {i + 1}", key=f"referencia_{i}", value=registro.referencia).upper()
+                                    referencia = st.text_input(f"Referência {i + 1} (Cadastrado)", key=f"referencia_cadastrada_{i+1}", value=registro.referencia).upper()
                                 
                                 with col_deletar:
                                     if st.button("Deletar este Serviço", key=f"deletar_funcao_{registro.id}"):
                                         apagar_servico(registro)
 
-                        else:
-                            # Se não houver registro suficiente, cria novos campos vazios
-                            with col_servico_padrao:
-                                servico_selecionado = st.selectbox(f"Descrição do Serviço {i + 1}", options=list(opcoes_servicos.keys()), key=f"descricao_do_servico_{i}")
-                                servico_selecionado_id = opcoes_servicos[servico_selecionado]
-                            
-                            with col_referencia:
-                                referencia = st.text_input(f"Referência {i + 1}", key=f"referencia_{i}").upper()
+                            else:
+                                # Se não houver registro suficiente, cria novos campos vazios
+                                with col_servico_padrao:
+                                    servico_selecionado = st.selectbox(f"Descrição do Serviço {i + 1} (Novo)", options=list(opcoes_servicos.keys()), key=f"descricao_do_servico_novo_{i+1}")
+                                    servico_selecionado_id = opcoes_servicos[servico_selecionado]
+                                
+                                with col_referencia:
+                                    referencia = st.text_input(f"Referência {i + 1} (Nova)", key=f"referencia_nova_{i+1}").upper()
 
 
-                            # Armazena a descrição e referência se ambos estiverem preenchidos
+                                # Armazena a descrição e referência se ambos estiverem preenchidos
                             if servico_selecionado_id and referencia:
-                                producao[i + 1] = {'servico_padrao_id': servico_padrao_id, 'referencia': referencia}
+                                    producao[i + 1] = {'servico_padrao_id': servico_padrao_id, 'referencia': referencia}
 
                         # Gravação dos serviços
                         if st.button("Gravar Serviços"):
                             problema = False
+
+                            if diario_selecionado_obj.relatorio_emitido:
+                                st.error("Este diário já foi incluído em um relatório mensal, portanto não pode ser alterado.")
 
                             if not producao:
                                 st.error("É necessário pelo menos 1 serviço para cada diário. Preencha algum no campo acima.")
@@ -483,8 +486,8 @@ def edita_diario():
 
                                 for i in range(num_campos_servicos):
                                     # Verifica se estamos lidando com um serviço existente
-                                    if i < len(servicos_cadastrados):
-                                        registro = servicos_cadastrados[i]
+                                    if i < len(servicos_cadastrados_diario):
+                                        registro = servicos_cadastrados_diario[i]
                                         # Atualiza o registro existente
                                         registro.servico_padrao_id = producao[i + 1]['servico_padrao_id']
                                         registro.referencia = producao[i + 1]['referencia']
@@ -492,7 +495,7 @@ def edita_diario():
                                     else:
                                         # Cria um novo serviço
                                         novo_servico = Servicos(
-                                            descricao=producao[i + 1]['descricao'],
+                                            servicos_padrao_id=producao[i + 1]['servico_padrao_id'],
                                             referencia=producao[i + 1]['referencia'],
                                             item=i+1,
                                             diario_id=diario_selecionado_obj.id  # Atribui o ID do diário
