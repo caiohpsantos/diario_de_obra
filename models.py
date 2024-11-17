@@ -9,7 +9,15 @@ def data_emissao_sao_paulo():
     return datetime.now(fuso_sao_paulo)
 
 # Criar o engine do banco de dados SQLite
-engine = create_engine('sqlite:///registro_obras.sqlite')
+connection_string = URL.create(
+    'postgresql',
+    username='koyeb-adm',
+    password='hlZr02uxQvdw',
+    host='ep-weathered-hill-a46i03xr.us-east-1.pg.koyeb.app',
+    database='koyebdb',
+)
+
+engine = create_engine(connection_string)
 
 # Base para os modelos do SQLAlchemy
 Base = declarative_base()
