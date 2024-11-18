@@ -3,14 +3,16 @@ import os
 import yaml
 import re
 import shutil
+from PIL import Image
 from fpdf import FPDF
 from fpdf.fonts import FontFace
 from time import sleep
 from yaml import SafeLoader
 from datetime import datetime
 import streamlit as st
-from models import session, Contrato, Obra, Foto
+from models import session, Contrato, Obra, Foto, Efetivo_Direto, Efetivo_Indireto, Servicos
 from sqlalchemy import func
+from sqlalchemy.exc import PendingRollbackError
 
 #Abre arquivo de configurações
 with open('config.yaml') as file:
@@ -65,7 +67,7 @@ def salvar_fotos_na_pasta(contrato, obra, diario, arquivos):
     '''
         Salva os arquivos fornecidos na pasta correspondente, troca o nome dele para
         o ano o mes e o dia, acrescente a a palavra 'diario', o id do diario, a palavra 'arquivo' e o número de arquivos que 
-        estão gravados pra aquele diário. 
+        estão gravados pra aquele diário. Também redimensiona a imagem para um valor fixo, otimizado para o relatório em pdf. 
         Exemplo: 2024.05.04_diario_7_arquivo_2.jpg
         7 é o número do diario
         2 é o terceiro arquivo cadastrado para aquela entrada do diário
@@ -108,14 +110,36 @@ def salvar_fotos_na_pasta(contrato, obra, diario, arquivos):
         para impedir que seja sobreescritos'''
         nome_arquivo = f"{diario.data.year}.{diario.data.month:02}.{diario.data.day:02}_contrato_{sanitizar_caminho_pasta(contrato.numero)}_obra_{obra.id}_diario_{diario.id}_arquivo_{index + contagem_fotos + 1}{extensao}"
         caminho_destino = os.path.join(caminho_pasta_diario, nome_arquivo)
+
+        '''Redimensiona a imagem para um padrão fixo, otimizado para o relatório e salva usando o caminho_destino gerado'''
         
         try:
-            with open(caminho_destino, "wb") as f:
-                f.write(arquivo.getbuffer() if hasattr(arquivo, 'getbuffer') else arquivo.read())
+            imagem = Image.open(arquivo)
+            imagem_redimensionada = imagem.resize((640,480))
+            imagem_redimensionada.save(caminho_destino)  # Salva diretamente no destino
             caminho_arquivos.append(caminho_destino)
         except Exception as e:
                 print(f"Erro ao salvar o arquivo {arquivo}: {e}")
     return caminho_arquivos
+
+def apagar_fotos_na_pasta(caminho_arquivos):
+    '''
+    Apaga as fotos fornecidas na lista caminho_arquivos, apaga tbm as pastas criadas para armazená-las.
+
+    :param caminho_arquivos: List, lista de caminhos de fotos
+    :return: True caso consiga apagar as fotos e False caso haja algum problema, além de mensagem de erro.
+    '''
+    try:
+        for arquivo in caminho_arquivos:
+            if os.path.exists(arquivo):
+                os.remove(arquivo)
+                sleep(0.5)
+    except FileNotFoundError:
+        st.error(f"O arquivo {arquivo} não foi encontrado. É possível que haja problemas no armazenamento. Contate o suporte pelo formulário no canto direito: Report a Bug")
+    except PermissionError:
+        st.error(f"Permissão negada para apgar o arquivo {arquivo}. Contate o suporte pelo formulário de erros no menu no canto direito: Report a Bug.")
+    except Exception as e:
+        st.error(f"Houve um erro ao apagar a foto {caminho}. Contate o suporte pelo formulário no canto direito: Report a Bug")
 
 #Funções que geram os modal (cxs de texto flutuante) para lidar com as remoções dos diários gravados (serviços, funções e fotos)
 @st.dialog("Apagar Foto")
@@ -192,9 +216,107 @@ def apagar_funcao(funcao):
             sleep(1)
             st.rerun()
 
+@st.dialog("Apagar Obra")
+def apagar_obra(obra):
+    '''Remove a obra fornecida, apagando o registro do banco de dados
+    
+    :param obra: Objeto Obra, objeto instanciado de Obra, contendo os dados da obra escolhida
+    :return: mensagem de aviso sobre ter ou não concluído o processo e finaliza a janela'''
+    st.warning("Deseja mesmo apagar esta obra? Essa ação não poderá ser desfeita")
+    st.write(obra)
+    col_cancelar, col_apagar = st.columns(2)
+    with col_cancelar:
+        if st.button("Não"):
+            st.error("Processo Cancelado")
+            sleep(1)
+            st.rerun()
+    
+    with col_apagar:
+        if st.button("Sim"):
+            session.delete(obra)
+            session.commit()
+            st.success("Obra removida com sucesso")
+            sleep(1)
+            st.rerun()
+
+@st.dialog("Apagar Contrato")
+def apagar_contrato(contrato):
+    '''Remove o contrato fornecido, apagando o registro do banco de dados
+    
+    :param obra: Objeto Contrato, objeto instanciado de Contrato, contendo os dados do contrato escolhido
+    :return: mensagem de aviso sobre ter ou não concluído o processo e finaliza a janela'''
+    st.warning("Deseja mesmo apagar este contrato? Essa ação não poderá ser desfeita")
+    st.write(contrato.nome)
+    col_cancelar, col_apagar = st.columns(2)
+    with col_cancelar:
+        if st.button("Não"):
+            st.error("Processo Cancelado")
+            sleep(1)
+            st.rerun()
+    
+    with col_apagar:
+        if st.button("Sim"):
+            session.delete(contrato)
+            session.commit()
+            st.success("Contrato removido com sucesso")
+            sleep(1)
+            st.rerun()
+
+@st.dialog("Apagar Diário")
+def apagar_diario(diario):
+    '''Remove o diário fornecido, apagando o registro do banco de dados
+    
+    :param diário: Objeto Diário, objeto instanciado de Diário, contendo os dados do contrato escolhido
+    :return: mensagem de aviso sobre ter ou não concluído o processo e finaliza a janela'''
+    st.warning("Deseja mesmo apagar este diário? Essa ação não poderá ser desfeita. As fotos também serão apagadas.")
+    st.write(diario)
+    col_cancelar, col_apagar = st.columns(2)
+    with col_cancelar:
+        if st.button("Não"):
+            st.error("Processo Cancelado")
+            sleep(1)
+            st.rerun()
+    
+    with col_apagar:
+        if st.button("Sim"):
+            with st.spinner():
+                try:
+                    # for funcao_indireta in session.query(Efetivo_Indireto).filter_by(diario_id=diario.id).all():
+                    #     session.delete(funcao_indireta)
+                    # for funcao_direta in session.query(Efetivo_Direto).filter_by(diario_id=diario.id).all():
+                    #     session.delete(funcao_direta)
+                    # for servico in session.query(Servicos).filter_by(diario_id=diario.id).all():
+                    #     session.delete(servico)
+                    for foto in session.query(Foto).filter_by(diario_id=diario.id).all():
+                        apagar_fotos_na_pasta(foto.caminho_arquivo)
+                        
+                        # session.delete(foto)
+                    session.delete(diario)
+                    session.commit()
+                    st.success("Diário removido com sucesso.")
+                    sleep(1)
+                    st.rerun()
+                except PendingRollbackError as e:
+                    session.rollback()
+
 #Funções que lidam com o relatório mensal
 
 class PDF(FPDF):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pagina_inicial_cabecalho = 2  # Define a partir de qual página o cabeçalho aparece
+        self.data = None
+    
+    # def header(self):
+    #     # Exibe o cabeçalho somente a partir de uma página específica
+    #     if self.page_no() >= self.pagina_inicial_cabecalho:
+    #         self.set_font('helvetica', "B", 14)
+    #         self.set_fill_color(255, 255, 255)
+    #         self.cell(
+    #         0, 0.7, f"RELATÓRIO FOTOGRÁFICO {self.data.strftime("%d/%m/%Y")}",
+    #         fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT'
+    #     )
+
     def footer(self):
         # Position cursor at 1.5 cm from bottom:
         self.set_y(-2)
@@ -219,6 +341,9 @@ def gera_relatorios(diarios):
     
     #laço de repetição para criar as páginas de cada diário enviado
     for diario in diarios:
+
+        pdf.data = diario.data
+
         pdf.add_page()
         #Cria as bordas do documento usando a função 
         pdf.desenhar_margens()
@@ -236,7 +361,7 @@ def gera_relatorios(diarios):
         pdf.set_fill_color(200, 200, 200) #cor cinza para os enunciados
         #Cria a linha que especifica contrato/obra
         pdf.cell(3.16,0.5,"Obra: ", border=True, align="R",fill=True)
-        pdf.cell(15.84,0.5, f"{diario.obra.contrato.nome} - {diario.obra.nome}", new_x='LMARGIN', new_y='NEXT', border=True)
+        pdf.multi_cell(15.84,0.5, f"{diario.obra.contrato.nome} - {diario.obra.nome}", new_x='LMARGIN', new_y='NEXT', border=True)
 
         #Cria a linha que especifica o cliente
         pdf.cell(3.16,0.5,"Cliente: ", border=True, align="R",fill=True)
@@ -362,10 +487,10 @@ def gera_relatorios(diarios):
         pdf.cell(5,0.5,"Madrugada", align="C", border=True, fill=True)
         #Troca o fundo da célula pra verde claro para realçar o clima registrado para aquele turno de serviço
         pdf.set_fill_color(146,208,80)
-        pdf.cell(3.48,0.5,"", align="C", border=True)#Limpo
-        pdf.cell(3.48,0.5,"", align="C", border=True)#Nublado
-        pdf.cell(3.48,0.5,"", align="C", border=True)#Chuva
-        pdf.cell(3.48,0.5,"", align="C", border=True,new_x='LMARGIN', new_y='NEXT')#Impraticável
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_madrugada == "Limpo" else False)#Limpo
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_madrugada == "Nublado" else False)#Nublado
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_madrugada == "Chuva" else False)#Chuva
+        pdf.cell(3.48,0.5,"", align="C", border=True, fill=True if diario.clima_madrugada == "Impraticável" else False,new_x='LMARGIN', new_y='NEXT')#Impraticável
 
         pdf.cell(h=0.2, w=0,new_x='LMARGIN', new_y='NEXT',text='') #linha em branco
 
@@ -434,26 +559,31 @@ def gera_relatorios(diarios):
         pdf.set_fill_color(200,200,200)
         pdf.cell(0,0.7,"Observações", fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT')
         pdf.set_fill_color(255,255,255)
-        pdf.cell(0,3.9,diario.observacoes, fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT')
+        pdf.cell(0,3,diario.observacoes, fill=True, align="C", border="LTR", new_x='LMARGIN', new_y='NEXT')
 
         # Configurações iniciais do cabeçalho
         pdf.set_font(style="B", size=14)
         pdf.set_fill_color(255, 255, 255)
-        pdf.cell(
-            0, 0.7, f"RELATÓRIO FOTOGRÁFICO {diario.data.strftime('%d/%m/%Y')}",
-            fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT'
-        )
+        
 
         # Configurações gerais
         col_width = pdf.epw / 2  # Divide a largura da página em 2 colunas
         row_height = (pdf.h - pdf.t_margin - pdf.b_margin) / 4  # Divide o espaço restante em 4 linhas
-        images_per_page = 8  # Total de imagens por página
+        images_per_page = 6  # Total de imagens por página
 
-        # Divide as fotos em grupos de 8 para cada página
+        # Divide as fotos em grupos de 6 para cada página
         grupos_fotos = [diario.fotos[i:i + images_per_page] for i in range(0, len(diario.fotos), images_per_page)]
 
         # Itera sobre os grupos de fotos para criar páginas
         for grupo in grupos_fotos:
+            pdf.add_page()
+
+            # Insere uma célula no topo da página
+            pdf.set_font("helvetica", "B", 12)  # Configura a fonte para o cabeçalho
+            pdf.cell(
+            0, 0.7, f"RELATÓRIO FOTOGRÁFICO {diario.data.strftime("%d/%m/%Y")}",
+            fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT'
+        )
             with pdf.table(
                 col_widths=[col_width] * 2,  # Duas colunas de largura igual
                 line_height=row_height,
@@ -464,7 +594,7 @@ def gera_relatorios(diarios):
                 for i in range(0, len(grupo), 2):  # Adiciona fotos em pares (2 por linha)
                     linha = table.row()
                     for foto in grupo[i:i + 2]:  # Garante que não exceda o número de colunas
-                        linha.cell(img=foto.caminho_arquivo)
+                        linha.cell(img=foto.caminho_arquivo, img_fill_width=True)
 
         # Posiciona a imagem final no rodapé, se necessário
         altura = 1

@@ -7,9 +7,13 @@ from models import session
 from forms import cadastros, diario, configuracoes, relatorios
 
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="Diário de Obras", menu_items={"Get help":"mailto:caiohpsantos@gmail.com",
+                                                                            "Report a bug": "https://forms.gle/44wLD4xNr4qzdmGq6",
+                                                                            "About":"Sistema para gerenciamento de diários de obra."})
 
-st.header("Sistema Gerenciamento Diário de Obras")
+
+st.header("Auditoria - Diário de Obras")
+
 
 with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -27,10 +31,11 @@ if not st.session_state['authentication_status']:
 
 if st.session_state['authentication_status']:
     with st.sidebar:
-            st.write(f'Bem-vindo *{st.session_state["name"]}*')
-            authenticator.logout()
+        st.image('images\\rudra-grande-fundo-transparente.png', use_column_width=True)
+        st.write(f'Bem-vindo *{st.session_state["name"]}*')
+        authenticator.logout()
 
-            menu = option_menu("Menu Principal", ["Diário de Obra", "Cadastros", "Relatório", "Configurações"])
+        menu = option_menu("Menu Principal", ["Diário de Obra", "Cadastros", "Relatório", "Configurações"])
 
     match menu:
 
@@ -65,11 +70,11 @@ if st.session_state['authentication_status']:
 
         case "Relatório":
 
-            menu_secundario = option_menu("Relatórios", ["Individual", "Em Lotes"], orientation="horizontal")
+            # menu_secundario = option_menu("Relatórios", ["Individual", "Em Lotes"], orientation="horizontal")
 
-            match menu_secundario:
+            # match menu_secundario:
 
-                case "Individual":
+            #     case "Individual":
                     relatorios.relatorio_individual()
 
         case "Configurações":

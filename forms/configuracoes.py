@@ -213,11 +213,16 @@ def servicos_padrao():
     # Função para exibir a lista de serviços padrão e permitir a exclusão
     def listar_servicos_padrao():
         servicos = session.query(Servicos_Padrao).all()
-        for servico in servicos:
-            col1, col2 = st.columns([1, 1])
+        for index, servico in enumerate(servicos):
+            col1, col2, col3 = st.columns(3, vertical_alignment="center", gap='large')
             with col1:
-                st.write(servico.descricao)
+                novo_valor = st.text_input(f"Serviço {index + 1}", value=servico.descricao, key=f"servico_padrao_{servico.id}")
             with col2:
+                if st.button("Alterar", key=f"alterar_{servico.id}"):
+                    servico.descricao = novo_valor
+                    session.commit()
+                    st.success("Serviço alterado com sucesso!")
+            with col3:
                 if st.button("Remover", key=f"remover_{servico.id}"):
                     session.delete(servico)
                     session.commit()

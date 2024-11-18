@@ -9,13 +9,7 @@ def data_emissao_sao_paulo():
     return datetime.now(fuso_sao_paulo)
 
 # Criar o engine do banco de dados SQLite
-connection_string = URL.create(
-    'postgresql',
-    username='koyeb-adm',
-    password='hlZr02uxQvdw',
-    host='ep-weathered-hill-a46i03xr.us-east-1.pg.koyeb.app',
-    database='koyebdb',
-)
+connection_string = 'sqlite:///registro_obras.sqlite'
 
 engine = create_engine(connection_string)
 
@@ -47,10 +41,10 @@ class Obra(Base):
     local = Column(String(255), nullable=False)          # Localização da obra
     inicio = Column(Date, nullable=False)                # Dia em que a obra começou
     termino = Column(Date, nullable=False)               # Prazo de conclusão da obra
-    ativo = Column(Boolean, nullable=False)              # Marca se a obra ainda está ativa ou foi encerrada    
+    ativo = Column(Boolean, nullable=False)              # Marca se a obra ainda está ativa ou foi encerrada
     contrato_numero = Column(Integer, ForeignKey('contratos.numero'))  # Chave estrangeira para contrato
-    created_at = Column(DateTime, default=data_emissao_sao_paulo)
-    usuario_criador = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=data_emissao_sao_paulo)      # Data de criação
+    usuario_criador = Column(String(100), nullable=False)              # Usuário que criou o registro
 
     # Relacionamento com o contrato (muitas obras -> um contrato)
     contrato = relationship('Contrato', back_populates='obras')
@@ -59,8 +53,9 @@ class Obra(Base):
     diarios = relationship('Diario', back_populates='obra')
 
     def __str__(self):
-        # Acessa o relacionamento diretamente, evitando a necessidade de uma nova consulta
-        return f"Obra {self.nome} do contrato {self.contrato.nome if self.contrato else 'Sem contrato'}"
+        # Garante acesso seguro ao relacionamento
+        contrato_nome = getattr(self.contrato, 'nome', 'Sem contrato associado')
+        return f"Obra {self.nome} do contrato {contrato_nome}"
 
 # Tabela diario
 class Diario(Base):
@@ -92,7 +87,7 @@ class Diario(Base):
     efetivo_indireto = relationship('Efetivo_Indireto', back_populates='diario', cascade="all, delete-orphan")
 
     def __str__(self):
-        return f"{self.obra.contrato.nome} - {self.obra.nome} / DIÁRIO {self.id} de {self.data}"
+        return f"{self.obra.contrato.nome} - {self.obra.nome} / DIÁRIO {self.id} de {self.data.strftime("%d/%m/%Y")}"
 
 # Tabela Servicos
 class Servicos(Base):

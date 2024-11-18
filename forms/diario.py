@@ -5,8 +5,9 @@ from time import sleep
 from yaml import SafeLoader
 from datetime import datetime, timedelta
 from models import session, Contrato, Obra, Diario, Foto, Servicos, Efetivo_Direto, Efetivo_Indireto, Servicos_Padrao, Base
-from .funcionalidades import salvar_fotos_na_pasta, apagar_foto, apagar_servico, apagar_funcao
+from .funcionalidades import salvar_fotos_na_pasta, apagar_foto, apagar_servico, apagar_funcao, apagar_fotos_na_pasta, apagar_diario
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 
 
 def novo_diario():
@@ -224,53 +225,94 @@ def novo_diario():
                     usuario_criador=st.session_state['name'])
                 session.add(novo_diario)
                 session.commit()
+                continuar = True
 
+                # Gravar as fotos
+                if continuar == True:
+                    try:
+                        caminho_arquivos_salvos = salvar_fotos_na_pasta(contrato_do_diario, obra_do_diario, novo_diario, fotos)
+                        for caminho in caminho_arquivos_salvos:
+                            nova_foto = Foto(
+                                caminho_arquivo = caminho,
+                                diario_id = novo_diario.id
+                                )
+                            session.add(nova_foto)
+                            session.commit()
+                            continuar = True
+                    except:
+                        session.delete(novo_diario)
+                        apagar_fotos_na_pasta(caminho_arquivos_salvos)
+                        continuar = False
+                        st.error(f"Houve um erro e não foi possível salvar as fotos deste diário. A operação foi cancelada. Caso o erro persista, entre em contato com o suporte.")
+                
                 # Gravar os serviços
-                for item, dados_servico in producao.items():
-                    novo_servico = Servicos(
-                        servicos_padrao_id = dados_servico['servico_selecionado_id'], 
-                        item=item, 
-                        referencia=dados_servico['referencia'], 
-                        diario_id=novo_diario.id)
-                    session.add(novo_servico)
-                    session.commit()
+                if continuar == True:
+                    try:
+                        for item, dados_servico in producao.items():
+                            novo_servico = Servicos(
+                                servicos_padrao_id = dados_servico['servico_selecionado_id'], 
+                                item=item, 
+                                referencia=dados_servico['referencia'], 
+                                diario_id=novo_diario.id)
+                            session.add(novo_servico)
+                            session.commit()
+                    except:
+                        for foto in session.query(fotos).filter_by(novo_diario.id).all():
+                            apagar_fotos_na_pasta(foto.caminho_arquivo)
+                            session.delete(foto)
+                        session.delete(novo_diario)
+                        continuar = False
+                        st.error("Não foi possível gravar os serviços selecionados para o novo diário. A operação foi cancelada. Caso o erro persista, entre em contato com o suporte.")
                 
                 
                 # Gravar a mão-de-obra separada em efetivos diretos e indiretos
-                for funcao, dados in efetivo_direto.items():
-                    novo_efetivo_direto = Efetivo_Direto(
-                        funcao=funcao,
-                        qtde=dados['qtde'],
-                        presente=dados['presente'],
-                        diario_id=novo_diario.id
-                    )
-                    session.add(novo_efetivo_direto)
-                    session.commit()
-                
-                
-                for funcao, dados in efetivo_indireto.items():
-                    
-                    novo_efetivo_indireto = Efetivo_Indireto(
-                        funcao=funcao,
-                        efetivo=dados['qtde'],
-                        diario_id = novo_diario.id
-                    )
-                    session.add(novo_efetivo_indireto)
-                    session.commit()
+                if continuar == True:
+                    try:
+                        for funcao, dados in efetivo_direto.items():
+                            novo_efetivo_direto = Efetivo_Direto(
+                                funcao=funcao,
+                                qtde=dados['qtde'],
+                                presente=dados['presente'],
+                                diario_id=novo_diario.id
+                            )
+                            session.add(novo_efetivo_direto)
+                            session.commit()
+                    except:
+                        for servico in session.query(Servicos).filter_by(novo_diario.id).all():
+                            session.delete(servico)
+                        for foto in session.query(fotos).filter_by(novo_diario.id).all():
+                            apagar_fotos_na_pasta(foto.caminho_arquivo)
+                            session.delete(foto)
+                        session.delete(novo_diario)
+                        continuar = False
+                        st.error("Não foi possível gravar o efetivo direto selecionado para o novo diário. A operação foi cancelada. Caso o erro persista, entre em contato com o suporte.")
 
-                # Gravar as fotos
                 
-                caminho_arquivos_salvos = salvar_fotos_na_pasta(contrato_do_diario, obra_do_diario, novo_diario, fotos)
-
-                for caminho in caminho_arquivos_salvos:
-                    nova_foto = Foto(
-                        caminho_arquivo = caminho,
-                        diario_id = novo_diario.id
-                        )
-                    session.add(nova_foto)
-                    session.commit()
+                if continuar == True:
+                    try:
+                        for funcao, dados in efetivo_indireto.items():
+                            
+                            novo_efetivo_indireto = Efetivo_Indireto(
+                                funcao=funcao,
+                                efetivo=dados['qtde'],
+                                diario_id = novo_diario.id
+                            )
+                            session.add(novo_efetivo_indireto)
+                            session.commit()
+                    except:
+                        for funcao_direta in session.query(Efetivo_Direto).filter_by(novo_diario.id).all():
+                            session.delete(funcao_direta)
+                        for servico in session.query(Servicos).filter_by(novo_diario.id).all():
+                            session.delete(servico)
+                        for foto in session.query(fotos).filter_by(novo_diario.id).all():
+                            apagar_fotos_na_pasta(foto.caminho_arquivo)
+                            session.delete(foto)
+                        session.delete(novo_diario)
+                        continuar = False
+                        st.error("Não foi possível gravar o efetivo indireto selecionado para o novo diário. A operação foi cancelada. Caso o erro persista, entre em contato com o suporte.")
+                        
                 
-                st.success("Diário de Obra gravado com sucesso")
+                    st.success("Diário de Obra gravado com sucesso")
 
 def edita_diario():
 
@@ -301,9 +343,9 @@ def edita_diario():
         # Filtro de Intervalo de Dias
         col1, col2 = st.columns(2)
         with col1:
-            data_inicio = st.date_input("Data Inicial (opcional)", value=datetime.today() - timedelta(days=7))
+            data_inicio = st.date_input("Data Inicial (opcional)", value=datetime.today() - timedelta(days=7), format="DD/MM/YYYY")
         with col2:
-            data_fim = st.date_input("Data Final (opcional)", value=datetime.today())
+            data_fim = st.date_input("Data Final (opcional)", value=datetime.today(), format="DD/MM/YYYY")
 
       
         # Verifica o intervalo de datas válido, caso as datas sejam informadas
@@ -330,15 +372,16 @@ def edita_diario():
 
             # Exibe os resultados
             if diarios_resultados:
-
+                
                 diario_opcoes = {f"{d.data.strftime('%d/%m/%Y')} - {d.obra.contrato.nome} - {d.obra.nome} - DIÁRIO {d.id}": d for d in diarios_resultados}
                 diario_selecionado = st.radio("Selecione um Diário:", list(diario_opcoes.keys()), index=None)
                 if diario_selecionado:
                     diario_selecionado_obj = diario_opcoes[diario_selecionado]
                     # Gera as abas para edição quando há um diario_selecionado no radio                
-                    tab_tempo, tab_producao, tab_efetivo, tab_foto = st.tabs(["Data/Tempo", "Produção", "Efetivo", "Fotos"])
+                    tab_tempo, tab_producao, tab_efetivo, tab_foto, tab_exclusao = st.tabs(["Data/Tempo", "Produção", "Efetivo", "Fotos", "Excluir"])
                     
                     st.caption(f"Criado por {diario_selecionado_obj.usuario_criador} em {diario_selecionado_obj.created_at.strftime('%d/%m/%Y %H:%M:%S')}")
+
 
                     #Para melhor visualização, separa o diário em 4 abas temáticas
 
@@ -663,14 +706,17 @@ def edita_diario():
                 
                                 caminho_arquivos_salvos = salvar_fotos_na_pasta(diario_selecionado_obj.obra.contrato, diario_selecionado_obj.obra, diario_selecionado_obj, fotos_para_adicionar)
 
-                                for caminho in caminho_arquivos_salvos:
-                                    nova_foto = Foto(
-                                        caminho_arquivo = caminho,
-                                        diario_id = diario_selecionado_obj.id
-                                        )
-                                    session.add(nova_foto)
-                                    session.commit()
+                                try:
+                                    for caminho in caminho_arquivos_salvos:
+                                        nova_foto = Foto(
+                                            caminho_arquivo = caminho,
+                                            diario_id = diario_selecionado_obj.id
+                                            )
+                                        session.add(nova_foto)
+                                        session.commit()
                                     st.success(f"Foto(s) adicionadas com sucesso ao diario")
+                                except:
+                                    st.error(f"Houve um erro ao gravar as fotos para o diario {diario_selecionado_obj}. Comunique o suporte no menu direito superior, em Report a Bug")
 
                         st.subheader("Remover Foto")
                         fotos_registradas = session.query(Foto).filter_by(diario_id=diario_selecionado_obj.id).all()
@@ -686,6 +732,14 @@ def edita_diario():
                                  if st.button("Remover esta foto", key=f"Apagar_foto_id{foto.id}"):
                                     apagar_foto(foto)
 
+                    #Aba que trata da exclusão do diário
+                    with tab_exclusao:
+                        
+                            st.subheader("Excluir Diário")
+                            st.write("Para excluir esse diário, clique no botão abaixo")
+                            if st.button("Excluir", key=f"excluir_diario_{diario_selecionado_obj.id}"):
+                                apagar_diario(diario_selecionado_obj)
+                        
                 else:
                     st.info("Nenhum diário encontrado para os critérios selecionados.")
 

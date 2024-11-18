@@ -1,6 +1,0 @@
-acrescentar data de inicio e fim do relatorio no cadastro do contrato - FEITO
-relatorio pdf tem que sair nome - RIAO RUDRA - (NOME OBRA) - (PERIODO EM MES) - (ANO)
-acrescentar madrugada no turno - FEITO
-criar registro de serviços padrão e acrescentar no diario como selectbox
-
-arrumar erro do presente

@@ -162,3 +162,4 @@ cython_debug/
 #.idea/
 
 registro_obras.sqlite
+chave_vps_renato.pem

@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import datetime
-from models import session, Contrato, Obra, Base
+from models import session, Contrato, Obra, Diario, Base
+from .funcionalidades import apagar_obra, apagar_contrato
 
 def cad_contrato():
     with st.form("form_cadastro_contratos"):
@@ -66,6 +67,17 @@ def edit_contrato():
     '''repete o formulário do cadastro, inserindo os dados do contrato como values dos campos'''
     
     if contrato_pra_editar:
+         #Caso não haja nenhum diário registrado para a obra selecionada habilita um botão para apagar a obra em questão do banco de dados
+        with st.expander("Exclusão"):    
+            if not session.query(Diario).join(Obra).join(Contrato).filter(Contrato.numero == contrato_pra_editar.numero).first():
+                st.caption("Este contrato ainda não possui nenhum diário relacionado a ele. Caso deseje excluí-lo, clique no botão abaixo.")
+                excluir = st.button("Excluir esta contrato")
+            else:
+                st.caption("Esta contrato já possui diários relacionados a ele. Não é possível excluí-lo. Para que ela não apareça mais na seleção para um novo diário desmarque a opção abaixo.")
+                excluir = False
+        
+        if excluir:
+            apagar_contrato(contrato_pra_editar)
     
         with st.form("form_editar_contratos"):
            
@@ -158,9 +170,9 @@ def cad_obra():
                     st.error("Preencha todos os campos")
                     problema=True
                 
-                '''Verifica se o nome da obra já está em uso'''
-                if session.query(Obra).filter_by(nome=nome_obra).first() is not None:
-                    st.error("Já existe uma obra com esse nome")
+                '''Verifica se o nome da obra já está em uso para aquele contrato'''
+                if session.query(Obra).filter_by(nome=nome_obra, contrato_numero=contrato_id).first() is not None:
+                    st.error("Já existe uma obra com esse nome para esse contrato")
                     problema = True
                 
                 '''Verifica se as data de inicio e termino são as mesmas'''
@@ -206,13 +218,26 @@ def edit_obra():
     
     '''repete o formulário do cadastro, inserindo os dados do contrato como values dos campos'''
     if obra_pra_editar:
-       with st.form("form_cadastro_obra"):
+        #Caso não haja nenhum diário registrado para a obra selecionada habilita um botão para apagar a obra em questão do banco de dados
+        with st.expander("Exclusão:"):    
+            if not session.query(Diario).filter_by(obra_id=obra_pra_editar.id).first():
+                st.caption("Esta obra ainda não possui nenhum diário relacionado a ela. Caso deseje excluí-la, clique no botão abaixo.")
+                excluir = st.button("Excluir esta obra")
+            else:
+                st.caption("Esta obra já possui diários relacionados a ela. Não é possível excluí-la. Para que ela não apareça mais na seleção para um novo diário desmarque a opção abaixo.")
+                excluir = False
+        
+        if excluir:
+            apagar_obra(obra_pra_editar)
+
+        with st.form("form_cadastro_obra"):
 
             st.title("Edição de Obras")
             st.divider()
             st.caption(f"Criado por {obra_pra_editar.usuario_criador} em {obra_pra_editar.created_at.strftime('%d/%m/%Y %H:%M:%S')}")
+
             # Determina a situação com base no estado atual da obra
-            situacao = 'Marque aqui para desativar essa obra' if obra_pra_editar.ativo else 'Marque aqui para ativar essa obra'
+            situacao = 'Desmarque aqui para desativar essa obra' if obra_pra_editar.ativo else 'Marque aqui para ativar essa obra'
             ativo_editado = st.checkbox(situacao, obra_pra_editar.ativo, help="Ao deixar essa opção marcada, essa obra pode ter diários registrados.")
 
             nome_obra_editado = st.text_input("Nome da Obra", value=obra_pra_editar.nome).upper().strip()
