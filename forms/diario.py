@@ -41,278 +41,285 @@ def novo_diario():
 
         data = st.date_input("Data", format="DD/MM/YYYY", value=datetime.today(),label_visibility='hidden')
 
-        st.divider()
-
-        st.subheader("Turno/Tempo")
-
-        col_manha,col_tarde,col_noite, col_madrugada = st.columns(4)
+        if data:
+            
+            if session.query(Diario).filter_by(obra_id=obra_do_diario.id, data=data).first():
+                st.error(f"Já existe um diário registrado para esse contrato/obra no dia {data.strftime("%d/%m/%Y")}. Você pode editá-lo no menu Editar Diário, logo acima.")
+            
+            else:
         
-        opcoes_clima = ["Limpo", "Nublado", "Chuva", "Impraticável"]
+                st.divider()
 
-        with col_manha:
-            clima_manha = st.radio("**CLIMA DA MANHÃ**", opcoes_clima)
+                st.subheader("Turno/Tempo")
 
-        with col_tarde:
-            clima_tarde = st.radio("**CLIMA DA TARDE**", opcoes_clima)
-
-        with col_noite:
-            clima_noite = st.radio("**CLIMA DA NOITE**", opcoes_clima)
-
-        with col_madrugada:
-            clima_madrugada = st.radio("**CLIMA DA MADRUGADA**", opcoes_clima)
-
-        st.divider()
-        # Trata dos serviços feitos
-        st.subheader("Produção Diária")
-
-        producao = {}
-
-        num_campos_servicos = st.slider("Quantos serviços foram feitos", min_value=1, max_value=14, value=1)
-
-        
-        # Carrega as opções de serviços em um dicionário {descricao: id}
-        opcoes_servicos = {servico.descricao: servico.id for servico in session.query(Servicos_Padrao).order_by(Servicos_Padrao.descricao).all()}
-
-        # Adiciona uma opção vazia para o selectbox
-        opcoes_servicos = {'': None, **opcoes_servicos}
-
-        col_servico, col_descricao = st.columns(2)
-        for i in range(num_campos_servicos):
-            with col_servico:
-                # Selectbox que exibe a descrição, mas retorna o id do serviço selecionado
-                servico_selecionado = st.selectbox(f"Descrição do Serviço {i + 1}", options=list(opcoes_servicos.keys()), key=f"descricao_do_servico_{i}")
-                servico_selecionado_id = opcoes_servicos[servico_selecionado]  # Obtém o id do serviço selecionado
-
-            with col_descricao:
-                referencia = st.text_input(f"Referência {i + 1}", key=f"referencia_{i}").upper().strip()
-
-            if servico_selecionado_id and referencia:
-                producao[i + 1] = {'servico_selecionado_id': servico_selecionado_id, 'referencia': referencia}
-
-
-        st.divider()
-        # Trata da mão-de-obra que foi alocada para esse contrato/obra/dia
-        st.subheader("Efetivo Alocado")
-
-        efetivo_direto = {}
-        efetivo_indireto = {}
-
-        efetivo_padrao = st.radio("Usar efetivo padrão", ["Sim", "Digitar Efetivo"], horizontal=True)
-        erro_presente = []
-        if efetivo_padrao == "Sim":
-            # Carrega a configuração inicial do YAML
-            with open('config.yaml') as file:
-                config = yaml.load(file, Loader=SafeLoader)
-
-            efetivo_direto = config['efetivo_direto']
-            
-            efetivo_indireto = config['efetivo_indireto']
-
-            col_direto, col_indireto = st.columns(2)
-            with col_direto:
-                st.text("Efetivo Direto")
-                st.table(efetivo_direto)
-            
-            with col_indireto:
-                st.text("Efetivo Indireto")
-                st.table(efetivo_indireto)
-            
-        else:
-            st.text("Efetivo Direto")
-            
-            num_campos_funcao_direta = st.slider("Quantas funções diretas", min_value=1, max_value=5, value=3)
-
-            for i in range(num_campos_funcao_direta):
+                col_manha,col_tarde,col_noite, col_madrugada = st.columns(4)
                 
-                col_funcao, col_qtde, col_presente, col_ausente, col_efetivo = st.columns([2,1,1,1,1])
+                opcoes_clima = ["Limpo", "Nublado", "Chuva", "Impraticável"]
 
-                with col_funcao:
-                    funcao = st.text_input(f"Função {i+1}", key=f"funcao_{i}").upper().strip()
-                with col_qtde:
-                    qtde = st.number_input("Quantidade", key=f"qtde_{i}", step=1, min_value=1)
-                with col_presente:
-                    presente = st.number_input("Presente", key=f"presente_{i}", step=1, min_value=0)
-                # Compara se o presente é maior que a qtde, caso seja mostra uma mensagem de erro e acrescenta
-                # o número da função numa lista para ser exibida após clicar no botão Gravar caso o usuário continue sem a correção
-                if qtde < presente:
-                    st.error(f"Função {i+1}: Há mais pessoas presentes do que a quantidade total de pessoas.")
-                    erro_presente.append(i + 1)
-                with col_ausente:
-                    ausente = st.number_input("Ausente", key=f"ausente_{i}", step=1, value=qtde-presente, disabled=True)
-                with col_efetivo:
-                    efetivo = st.number_input("Efetivo", disabled=True, key=f'efetivo_{i}', step=1, value=qtde-ausente)
+                with col_manha:
+                    clima_manha = st.radio("**CLIMA DA MANHÃ**", opcoes_clima)
+
+                with col_tarde:
+                    clima_tarde = st.radio("**CLIMA DA TARDE**", opcoes_clima)
+
+                with col_noite:
+                    clima_noite = st.radio("**CLIMA DA NOITE**", opcoes_clima)
+
+                with col_madrugada:
+                    clima_madrugada = st.radio("**CLIMA DA MADRUGADA**", opcoes_clima)
+
+                st.divider()
+                # Trata dos serviços feitos
+                st.subheader("Produção Diária")
+
+                producao = {}
+
+                num_campos_servicos = st.slider("Quantos serviços foram feitos", min_value=1, max_value=14, value=1)
+
                 
-                if funcao and qtde:
-                    efetivo_direto[funcao] = {
-                        'qtde': qtde, 
-                        'presente':presente,
-                        'ausente':ausente, 
-                        'efetivo':efetivo
-                        }
+                # Carrega as opções de serviços em um dicionário {descricao: id}
+                opcoes_servicos = {servico.descricao: servico.id for servico in session.query(Servicos_Padrao).order_by(Servicos_Padrao.descricao).all()}
+
+                # Adiciona uma opção vazia para o selectbox
+                opcoes_servicos = {'': None, **opcoes_servicos}
+
+                col_servico, col_descricao = st.columns(2)
+                for i in range(num_campos_servicos):
+                    with col_servico:
+                        # Selectbox que exibe a descrição, mas retorna o id do serviço selecionado
+                        servico_selecionado = st.selectbox(f"Descrição do Serviço {i + 1}", options=list(opcoes_servicos.keys()), key=f"descricao_do_servico_{i}")
+                        servico_selecionado_id = opcoes_servicos[servico_selecionado]  # Obtém o id do serviço selecionado
+
+                    with col_descricao:
+                        referencia = st.text_input(f"Referência {i + 1}", key=f"referencia_{i}").upper().strip()
+
+                    if servico_selecionado_id and referencia:
+                        producao[i + 1] = {'servico_selecionado_id': servico_selecionado_id, 'referencia': referencia}
+
+
+                st.divider()
+                # Trata da mão-de-obra que foi alocada para esse contrato/obra/dia
+                st.subheader("Efetivo Alocado")
+
+                efetivo_direto = {}
+                efetivo_indireto = {}
+
+                efetivo_padrao = st.radio("Usar efetivo padrão", ["Sim", "Digitar Efetivo"], horizontal=True)
+                erro_presente = []
+                if efetivo_padrao == "Sim":
+                    # Carrega a configuração inicial do YAML
+                    with open('config.yaml') as file:
+                        config = yaml.load(file, Loader=SafeLoader)
+
+                    efetivo_direto = config['efetivo_direto']
                     
+                    efetivo_indireto = config['efetivo_indireto']
 
+                    col_direto, col_indireto = st.columns(2)
+                    with col_direto:
+                        st.text("Efetivo Direto")
+                        st.table(efetivo_direto)
+                    
+                    with col_indireto:
+                        st.text("Efetivo Indireto")
+                        st.table(efetivo_indireto)
+                    
+                else:
+                    st.text("Efetivo Direto")
+                    
+                    num_campos_funcao_direta = st.slider("Quantas funções diretas", min_value=1, max_value=5, value=3)
 
-            st.text("Efetivo Indireto")
-            num_campos_funcao_indireta = st.slider("Quantas funções indiretas", min_value=1, max_value=5, value=3)
-            for i in range(num_campos_funcao_indireta):
-            
-                col_funcao, col_efetivo = st.columns([2,1])
-
-                with col_funcao:
-                    funcao =  st.text_input(f"Função {i+1}", key=f"funcao_indireta_{i}").upper()
-
-                with col_efetivo:
-                    efetivo = st.number_input("Efetivo", key=f'efetivo_indireto_{i}', step=1)
-
-                if funcao:
-                    efetivo_indireto[funcao] = efetivo
-        
-        st.divider()
-        # Trata de observações diversas que não estão previstas no relatório
-        st.subheader("Observações")
-
-        observacoes = st.text_area("Digite as observações").upper().strip()
-
-        st.divider()
-        # Trata das fotos que devem ser anexadas ao diário
-        st.subheader("Registro Fotográfico")
-
-        fotos = st.file_uploader("Adicione as fotos", ["jpg", "jpeg", "png", "bmp"], True)
-
-        gravar = st.button("Gravar")
-
-        #Inicia a gravação
-        if gravar:
-
-            problema = False
-            #Verifica se todos os campos foram preenchidos
-            if not producao:
-                st.error("Não há nenhum serviço preenchido")
-                problema = True
-
-            #Verifica se a opção para digitar a mão-de-obra está ativa e se há valores digitados
-            if efetivo_padrao == "Digitar Efetivo" and (efetivo_direto == {} or efetivo_indireto == {}):
-                st.error("Foi escolhida a opção de digitar o efetivo alocado, porém não foram registradas nenhuma função ou quantidade de pessoas.")
-                problema = True
-            
-            #Verifica se a qtde de pessoas em determinada função é menor que os presentes
-            if erro_presente:
-                st.error(f"Corrija as funções com quantidade incorreta: {', '.join(map(str, erro_presente))}")
-                problema = True
-
-            #Verificas e há fotos para cadastrar
-            if not fotos:
-                st.error("Não há fotos registradas para este diário. Verifique acima.")
-                problema = True
-
-            #Verificas e já há um diário cadastrado para a dupla contrato/obra no dia preenchido
-            if session.query(Diario).filter_by(obra_id = obra_do_diario.id, data=data).first() is not None:
-                st.error(f"Já existe um diário gravado para este contrato/obra no dia {data.strftime("%d/%m/%Y")}")
-                problema = True
-            
-            #Caso não tenha nenhum problema inicia a gravação do diário por partes
-            if problema == False:
-
-                # Gravar o diário
-                novo_diario = Diario(
-                    data=data, 
-                    clima_manha=clima_manha, 
-                    clima_tarde=clima_tarde, 
-                    clima_noite=clima_noite,
-                    clima_madrugada=clima_madrugada,
-                    observacoes=observacoes, 
-                    obra_id = obra_do_diario.id,
-                    usuario_criador=st.session_state['name'])
-                session.add(novo_diario)
-                session.commit()
-                continuar = True
-
-                # Gravar as fotos
-                if continuar == True:
-                    try:
-                        caminho_arquivos_salvos = salvar_fotos_na_pasta(contrato_do_diario, obra_do_diario, novo_diario, fotos)
-                        for caminho in caminho_arquivos_salvos:
-                            nova_foto = Foto(
-                                caminho_arquivo = caminho,
-                                diario_id = novo_diario.id
-                                )
-                            session.add(nova_foto)
-                            session.commit()
-                            continuar = True
-                    except:
-                        session.delete(novo_diario)
-                        apagar_fotos_na_pasta(caminho_arquivos_salvos)
-                        continuar = False
-                        st.error(f"Houve um erro e não foi possível salvar as fotos deste diário. A operação foi cancelada. Caso o erro persista, entre em contato com o suporte.")
-                
-                # Gravar os serviços
-                if continuar == True:
-                    try:
-                        for item, dados_servico in producao.items():
-                            novo_servico = Servicos(
-                                servicos_padrao_id = dados_servico['servico_selecionado_id'], 
-                                item=item, 
-                                referencia=dados_servico['referencia'], 
-                                diario_id=novo_diario.id)
-                            session.add(novo_servico)
-                            session.commit()
-                    except:
-                        for foto in session.query(fotos).filter_by(novo_diario.id).all():
-                            apagar_fotos_na_pasta(foto.caminho_arquivo)
-                            session.delete(foto)
-                        session.delete(novo_diario)
-                        continuar = False
-                        st.error("Não foi possível gravar os serviços selecionados para o novo diário. A operação foi cancelada. Caso o erro persista, entre em contato com o suporte.")
-                
-                
-                # Gravar a mão-de-obra separada em efetivos diretos e indiretos
-                if continuar == True:
-                    try:
-                        for funcao, dados in efetivo_direto.items():
-                            novo_efetivo_direto = Efetivo_Direto(
-                                funcao=funcao,
-                                qtde=dados['qtde'],
-                                presente=dados['presente'],
-                                diario_id=novo_diario.id
-                            )
-                            session.add(novo_efetivo_direto)
-                            session.commit()
-                    except:
-                        for servico in session.query(Servicos).filter_by(novo_diario.id).all():
-                            session.delete(servico)
-                        for foto in session.query(fotos).filter_by(novo_diario.id).all():
-                            apagar_fotos_na_pasta(foto.caminho_arquivo)
-                            session.delete(foto)
-                        session.delete(novo_diario)
-                        continuar = False
-                        st.error("Não foi possível gravar o efetivo direto selecionado para o novo diário. A operação foi cancelada. Caso o erro persista, entre em contato com o suporte.")
-
-                
-                if continuar == True:
-                    try:
-                        for funcao, dados in efetivo_indireto.items():
-                            
-                            novo_efetivo_indireto = Efetivo_Indireto(
-                                funcao=funcao,
-                                efetivo=dados['qtde'],
-                                diario_id = novo_diario.id
-                            )
-                            session.add(novo_efetivo_indireto)
-                            session.commit()
-                    except:
-                        for funcao_direta in session.query(Efetivo_Direto).filter_by(novo_diario.id).all():
-                            session.delete(funcao_direta)
-                        for servico in session.query(Servicos).filter_by(novo_diario.id).all():
-                            session.delete(servico)
-                        for foto in session.query(fotos).filter_by(novo_diario.id).all():
-                            apagar_fotos_na_pasta(foto.caminho_arquivo)
-                            session.delete(foto)
-                        session.delete(novo_diario)
-                        continuar = False
-                        st.error("Não foi possível gravar o efetivo indireto selecionado para o novo diário. A operação foi cancelada. Caso o erro persista, entre em contato com o suporte.")
+                    for i in range(num_campos_funcao_direta):
                         
+                        col_funcao, col_qtde, col_presente, col_ausente, col_efetivo = st.columns([2,1,1,1,1])
+
+                        with col_funcao:
+                            funcao = st.text_input(f"Função {i+1}", key=f"funcao_{i}").upper().strip()
+                        with col_qtde:
+                            qtde = st.number_input("Quantidade", key=f"qtde_{i}", step=1, min_value=1)
+                        with col_presente:
+                            presente = st.number_input("Presente", key=f"presente_{i}", step=1, min_value=0)
+                        # Compara se o presente é maior que a qtde, caso seja mostra uma mensagem de erro e acrescenta
+                        # o número da função numa lista para ser exibida após clicar no botão Gravar caso o usuário continue sem a correção
+                        if qtde < presente:
+                            st.error(f"Função {i+1}: Há mais pessoas presentes do que a quantidade total de pessoas.")
+                            erro_presente.append(i + 1)
+                        with col_ausente:
+                            ausente = st.number_input("Ausente", key=f"ausente_{i}", step=1, value=qtde-presente, disabled=True)
+                        with col_efetivo:
+                            efetivo = st.number_input("Efetivo", disabled=True, key=f'efetivo_{i}', step=1, value=qtde-ausente)
+                        
+                        if funcao and qtde:
+                            efetivo_direto[funcao] = {
+                                'qtde': qtde, 
+                                'presente':presente,
+                                'ausente':ausente, 
+                                'efetivo':efetivo
+                                }
+                            
+
+
+                    st.text("Efetivo Indireto")
+                    num_campos_funcao_indireta = st.slider("Quantas funções indiretas", min_value=1, max_value=5, value=3)
+                    for i in range(num_campos_funcao_indireta):
+                    
+                        col_funcao, col_efetivo = st.columns([2,1])
+
+                        with col_funcao:
+                            funcao =  st.text_input(f"Função {i+1}", key=f"funcao_indireta_{i}").upper()
+
+                        with col_efetivo:
+                            efetivo = st.number_input("Efetivo", key=f'efetivo_indireto_{i}', step=1)
+
+                        if funcao:
+                            efetivo_indireto[funcao] = efetivo
                 
-                    st.success("Diário de Obra gravado com sucesso")
+                st.divider()
+                # Trata de observações diversas que não estão previstas no relatório
+                st.subheader("Observações")
+
+                observacoes = st.text_area("Digite as observações").upper().strip()
+
+                st.divider()
+                # Trata das fotos que devem ser anexadas ao diário
+                st.subheader("Registro Fotográfico")
+
+                fotos = st.file_uploader("Adicione as fotos", ["jpg", "jpeg", "png", "bmp"], True)
+
+                gravar = st.button("Gravar")
+
+                #Inicia a gravação
+                if gravar:
+
+                    problema = False
+                    #Verifica se todos os campos foram preenchidos
+                    if not producao:
+                        st.error("Não há nenhum serviço preenchido")
+                        problema = True
+
+                    #Verifica se a opção para digitar a mão-de-obra está ativa e se há valores digitados
+                    if efetivo_padrao == "Digitar Efetivo" and (efetivo_direto == {} or efetivo_indireto == {}):
+                        st.error("Foi escolhida a opção de digitar o efetivo alocado, porém não foram registradas nenhuma função ou quantidade de pessoas.")
+                        problema = True
+                    
+                    #Verifica se a qtde de pessoas em determinada função é menor que os presentes
+                    if erro_presente:
+                        st.error(f"Corrija as funções com quantidade incorreta: {', '.join(map(str, erro_presente))}")
+                        problema = True
+
+                    #Verificas e há fotos para cadastrar
+                    if not fotos:
+                        st.error("Não há fotos registradas para este diário. Verifique acima.")
+                        problema = True
+
+                    #Verificas e já há um diário cadastrado para a dupla contrato/obra no dia preenchido
+                    if session.query(Diario).filter_by(obra_id = obra_do_diario.id, data=data).first() is not None:
+                        st.error(f"Já existe um diário gravado para este contrato/obra no dia {data.strftime("%d/%m/%Y")}")
+                        problema = True
+                    
+                    #Caso não tenha nenhum problema inicia a gravação do diário por partes
+                    if problema == False:
+
+                        # Gravar o diário
+                        novo_diario = Diario(
+                            data=data, 
+                            clima_manha=clima_manha, 
+                            clima_tarde=clima_tarde, 
+                            clima_noite=clima_noite,
+                            clima_madrugada=clima_madrugada,
+                            observacoes=observacoes, 
+                            obra_id = obra_do_diario.id,
+                            usuario_criador=st.session_state['name'])
+                        session.add(novo_diario)
+                        session.commit()
+                        continuar = True
+
+                        # Gravar as fotos
+                        if continuar == True:
+                            try:
+                                caminho_arquivos_salvos = salvar_fotos_na_pasta(contrato_do_diario, obra_do_diario, novo_diario, fotos)
+                                for caminho in caminho_arquivos_salvos:
+                                    nova_foto = Foto(
+                                        caminho_arquivo = caminho,
+                                        diario_id = novo_diario.id
+                                        )
+                                    session.add(nova_foto)
+                                    session.commit()
+                                    continuar = True
+                            except:
+                                session.delete(novo_diario)
+                                apagar_fotos_na_pasta(caminho_arquivos_salvos)
+                                continuar = False
+                                st.error(f"Houve um erro e não foi possível salvar as fotos deste diário. A operação foi cancelada. Caso o erro persista, entre em contato com o suporte.")
+                        
+                        # Gravar os serviços
+                        if continuar == True:
+                            try:
+                                for item, dados_servico in producao.items():
+                                    novo_servico = Servicos(
+                                        servicos_padrao_id = dados_servico['servico_selecionado_id'], 
+                                        item=item, 
+                                        referencia=dados_servico['referencia'], 
+                                        diario_id=novo_diario.id)
+                                    session.add(novo_servico)
+                                    session.commit()
+                            except:
+                                for foto in session.query(fotos).filter_by(novo_diario.id).all():
+                                    apagar_fotos_na_pasta(foto.caminho_arquivo)
+                                    session.delete(foto)
+                                session.delete(novo_diario)
+                                continuar = False
+                                st.error("Não foi possível gravar os serviços selecionados para o novo diário. A operação foi cancelada. Caso o erro persista, entre em contato com o suporte.")
+                        
+                        
+                        # Gravar a mão-de-obra separada em efetivos diretos e indiretos
+                        if continuar == True:
+                            try:
+                                for funcao, dados in efetivo_direto.items():
+                                    novo_efetivo_direto = Efetivo_Direto(
+                                        funcao=funcao,
+                                        qtde=dados['qtde'],
+                                        presente=dados['presente'],
+                                        diario_id=novo_diario.id
+                                    )
+                                    session.add(novo_efetivo_direto)
+                                    session.commit()
+                            except:
+                                for servico in session.query(Servicos).filter_by(novo_diario.id).all():
+                                    session.delete(servico)
+                                for foto in session.query(fotos).filter_by(novo_diario.id).all():
+                                    apagar_fotos_na_pasta(foto.caminho_arquivo)
+                                    session.delete(foto)
+                                session.delete(novo_diario)
+                                continuar = False
+                                st.error("Não foi possível gravar o efetivo direto selecionado para o novo diário. A operação foi cancelada. Caso o erro persista, entre em contato com o suporte.")
+
+                        
+                        if continuar == True:
+                            try:
+                                for funcao, dados in efetivo_indireto.items():
+                                    
+                                    novo_efetivo_indireto = Efetivo_Indireto(
+                                        funcao=funcao,
+                                        efetivo=dados['qtde'],
+                                        diario_id = novo_diario.id
+                                    )
+                                    session.add(novo_efetivo_indireto)
+                                    session.commit()
+                            except:
+                                for funcao_direta in session.query(Efetivo_Direto).filter_by(novo_diario.id).all():
+                                    session.delete(funcao_direta)
+                                for servico in session.query(Servicos).filter_by(novo_diario.id).all():
+                                    session.delete(servico)
+                                for foto in session.query(fotos).filter_by(novo_diario.id).all():
+                                    apagar_fotos_na_pasta(foto.caminho_arquivo)
+                                    session.delete(foto)
+                                session.delete(novo_diario)
+                                continuar = False
+                                st.error("Não foi possível gravar o efetivo indireto selecionado para o novo diário. A operação foi cancelada. Caso o erro persista, entre em contato com o suporte.")
+                                
+                        
+                            st.success("Diário de Obra gravado com sucesso")
 
 def edita_diario():
 

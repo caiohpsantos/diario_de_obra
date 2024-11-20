@@ -1,6 +1,5 @@
-from models import session, Foto
+from models import session, Foto, Obra, Diario
 
-for foto in session.query(Foto).filter_by(diario_id=36).all():
-    print(foto.caminho_arquivo)
-    session.delete(foto)
+obra = session.query(Obra).filter_by(id=20).first()
+session.delete(obra)
 session.commit()

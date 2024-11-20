@@ -281,16 +281,8 @@ def apagar_diario(diario):
         if st.button("Sim"):
             with st.spinner():
                 try:
-                    # for funcao_indireta in session.query(Efetivo_Indireto).filter_by(diario_id=diario.id).all():
-                    #     session.delete(funcao_indireta)
-                    # for funcao_direta in session.query(Efetivo_Direto).filter_by(diario_id=diario.id).all():
-                    #     session.delete(funcao_direta)
-                    # for servico in session.query(Servicos).filter_by(diario_id=diario.id).all():
-                    #     session.delete(servico)
                     for foto in session.query(Foto).filter_by(diario_id=diario.id).all():
                         apagar_fotos_na_pasta(foto.caminho_arquivo)
-                        
-                        # session.delete(foto)
                     session.delete(diario)
                     session.commit()
                     st.success("Diário removido com sucesso.")
@@ -498,13 +490,13 @@ def gera_relatorios(diarios):
         #Cria os cabeçalhos
         pdf.set_fill_color(200, 200, 200)
         pdf.cell(0,0.5,"Produção Diária", fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT')
-        pdf.cell(8.5,0.5,"Descrição dos Serviços", fill=True, align="C", border=True)
-        pdf.cell(2,0.5,"Item",fill=True, align="C", border=True)
-        pdf.cell(8.5,0.5,"Referência", fill=True, align="C", border=True,new_x='LMARGIN', new_y='NEXT')
+        pdf.cell(9,0.5,"Descrição dos Serviços", fill=True, align="C", border=True)
+        pdf.cell(1,0.5,"Item",fill=True, align="C", border=True)
+        pdf.cell(9,0.5,"Referência", fill=True, align="C", border=True,new_x='LMARGIN', new_y='NEXT')
 
         #Preenche a tabela com os serviços cadastrados
         pdf.set_fill_color("#FFFFFF")
-        pdf.set_font('',size=8)
+        pdf.set_font('',size=6)
         dados_servico = []
         for servico in diario.servicos:
             servico_da_vez = [f"{servico.servicos_padrao.descricao}",f"{servico.item}", f"{servico.referencia}"]
@@ -515,7 +507,7 @@ def gera_relatorios(diarios):
         for _ in range(linhas_vazias):
             dados_servico.append(["", "", ""])  # Adiciona uma linha vazia com três colunas
         #Cria a tabela usando table do FPDF
-        with pdf.table(text_align="CENTER", col_widths=(8.5,2,8.5), first_row_as_headings=False) as table:
+        with pdf.table(text_align="CENTER", col_widths=(9,1,9), first_row_as_headings=False, line_height=0.5) as table:
             for linha_tabela in dados_servico:
                 linha = table.row()
                 for dados in linha_tabela:
@@ -559,7 +551,7 @@ def gera_relatorios(diarios):
         pdf.set_fill_color(200,200,200)
         pdf.cell(0,0.7,"Observações", fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT')
         pdf.set_fill_color(255,255,255)
-        pdf.cell(0,3,diario.observacoes, fill=True, align="C", border="LTR", new_x='LMARGIN', new_y='NEXT')
+        pdf.cell(0,1,diario.observacoes, fill=True, align="C", new_x='LMARGIN', new_y='NEXT')
 
         # Configurações iniciais do cabeçalho
         pdf.set_font(style="B", size=14)
