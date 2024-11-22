@@ -42,7 +42,7 @@ class Obra(Base):
     inicio = Column(Date, nullable=False)                # Dia em que a obra começou
     termino = Column(Date, nullable=False)               # Prazo de conclusão da obra
     ativo = Column(Boolean, nullable=False)              # Marca se a obra ainda está ativa ou foi encerrada
-    contrato_numero = Column(Integer, ForeignKey('contratos.numero'))  # Chave estrangeira para contrato
+    contrato_numero = Column(String(50), ForeignKey('contratos.numero'))  # Chave estrangeira para contrato
     created_at = Column(DateTime, default=data_emissao_sao_paulo)      # Data de criação
     usuario_criador = Column(String(100), nullable=False)              # Usuário que criou o registro
 
@@ -87,7 +87,8 @@ class Diario(Base):
     efetivo_indireto = relationship('Efetivo_Indireto', back_populates='diario', cascade="all, delete-orphan")
 
     def __str__(self):
-        return f"{self.obra.contrato.nome} - {self.obra.nome} / DIÁRIO {self.id} de {self.data.strftime("%d/%m/%Y")}"
+        contrato_nome = getattr(self.obra.contrato, 'nome', 'Sem contrato associado')
+        return f"{contrato_nome} - {self.obra.nome} / DIÁRIO {self.id} de {self.data.strftime('%d/%m/%Y')}"
 
 # Tabela Servicos
 class Servicos(Base):
@@ -103,6 +104,9 @@ class Servicos(Base):
 
     # Relacionamento com Serviços_Padrao
     servicos_padrao = relationship('Servicos_Padrao', back_populates='servicos')
+
+    def __str__(self):
+        return self.servicos_padrao.descricao
 
 # Tabela Efetivo Direto
 class Efetivo_Direto(Base):

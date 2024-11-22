@@ -1,4 +1,5 @@
 import yaml
+import os
 from yaml.loader import SafeLoader
 import streamlit as st
 import streamlit_authenticator as stauth
@@ -31,7 +32,7 @@ if not st.session_state['authentication_status']:
 
 if st.session_state['authentication_status']:
     with st.sidebar:
-        st.image('images\\rudra-grande-fundo-transparente.png', use_column_width=True)
+        st.image(os.path.join(os.getcwd(), 'images', 'rudra-grande-fundo-transparente.png'), use_column_width=True)
         st.write(f'Bem-vindo *{st.session_state["name"]}*')
         authenticator.logout()
 
@@ -79,7 +80,7 @@ if st.session_state['authentication_status']:
 
         case "Configurações":
 
-            menu_secundario = option_menu("Configurações", ["Alterar Senha", "Armazenamento", "Efetivo Padrão", "Serviços Padrão"], orientation="horizontal")
+            menu_secundario = option_menu("Configurações", ["Alterar Senha", "Armazenamento", "Efetivo Padrão", "Serviços Padrão", "Controle de Versão"], orientation="horizontal")
 
             match menu_secundario:
 
@@ -112,6 +113,8 @@ if st.session_state['authentication_status']:
                 case "Serviços Padrão":
                     configuracoes.servicos_padrao()
 
+                case "Controle de Versão":
+                    configuracoes.versoes()
 elif st.session_state['authentication_status'] is False:
     st.error('Usuário ou senha incorretos')
 

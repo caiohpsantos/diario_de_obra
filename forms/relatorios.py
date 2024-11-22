@@ -4,6 +4,7 @@ import streamlit as st
 import calendar
 import locale
 from sqlalchemy import func, extract, asc
+from sqlalchemy.orm import joinedload
 from time import sleep
 from yaml import SafeLoader
 from datetime import datetime, timedelta
@@ -127,11 +128,23 @@ def relatorio_individual():
                 data_fim = datetime(ano_fim, mes_fim, contrato_pro_relatorio.dia_finaliza_relatorio)
                 
                 #Monta a consulta com o contrato/obra selecionados e as datas montadas acima
-                diarios = session.query(Diario).join(Obra).join(Contrato).filter(Contrato.numero == contrato_pro_relatorio.numero,
-                                                        Obra.id == obra_pro_relatorio.id, 
-                                                        Diario.data.between(data_inicio, data_fim)
-                                                        ).order_by(asc(Diario.data)).all()
-                
+                diarios = (
+                            session.query(Diario)
+                            .options(
+                                joinedload(Diario.obra).joinedload(Obra.contrato),  # Carrega obra e contrato associados
+                                joinedload(Diario.fotos),                          # Carrega fotos relacionadas ao diário
+                                joinedload(Diario.servicos),                       # Carrega serviços relacionados ao diário
+                            )
+                            .join(Obra)
+                            .join(Contrato)
+                            .filter(
+                                Contrato.numero == contrato_pro_relatorio.numero,
+                                Obra.id == obra_pro_relatorio.id,
+                                Diario.data.between(data_inicio, data_fim),
+                            )
+                            .order_by(asc(Diario.data))
+                            .all()
+                )                
             st.divider()
 
             st.subheader("Diários localizados")

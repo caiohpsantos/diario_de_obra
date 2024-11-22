@@ -2,7 +2,7 @@ import os
 import yaml
 import streamlit as st
 from yaml import SafeLoader
-from models import session, Servicos_Padrao
+from models import session, Servicos_Padrao, Servicos
 
 
 def armazenamento():
@@ -214,7 +214,7 @@ def servicos_padrao():
     def listar_servicos_padrao():
         servicos = session.query(Servicos_Padrao).all()
         for index, servico in enumerate(servicos):
-            col1, col2, col3 = st.columns(3, vertical_alignment="center", gap='large')
+            col1, col2, col3 = st.columns([3,1,1], vertical_alignment="center", gap='large')
             with col1:
                 novo_valor = st.text_input(f"Serviço {index + 1}", value=servico.descricao, key=f"servico_padrao_{servico.id}")
             with col2:
@@ -223,7 +223,10 @@ def servicos_padrao():
                     session.commit()
                     st.success("Serviço alterado com sucesso!")
             with col3:
-                if st.button("Remover", key=f"remover_{servico.id}"):
+                desabilitar = False
+                if session.query(Servicos).filter(Servicos.servicos_padrao_id == servico.id).first():
+                    desabilitar = True
+                if st.button("Remover", key=f"remover_{servico.id}", disabled=desabilitar, help="Caso não consiga clicar, significa que este serviço é referenciado em algum diário, portanto não pode ser apagado. Mas ainda pode editá-lo."):
                     session.delete(servico)
                     session.commit()
                     st.success("Serviço removido com sucesso!")
@@ -255,3 +258,85 @@ def servicos_padrao():
     st.divider()
     listar_servicos_padrao()
 
+def versoes():
+    st.title("Versões e correções")
+    st.subheader('1.3')
+    st.write('''
+            **Cadastro de Diário:**\n
+            * Há casos em que um diário pode ser registrado sem fotos. Há uma restrição que impede o registro do diário sem fotos.\n
+            Corrigido, a restrição foi tirada e o diário pode ser registrado sem fotos.\n
+            **Edição de Diário:**\n
+            * A consulta que buscava os diários não carregava os relacionamentos das tabelas completamente, gerando erros. Corrigido, os relacionamentos\n
+            entre as tabelas são carregados forçadamente junto com a consulta.
+            * Ao editar um serviço que já existia em um diário já cadastrado, todos os serviços acabam ficando como o primeiro. Corrigido, agora cada serviço\n
+            é salvo corretamente e tanto a edição quanto a adição de novos serviços funcionam corretamente.\n
+            * Um diário agora pode ser registrado sem fotos. A tela da Edição de Diários foi atualizada para lidar com diários sem fotos.\n
+            **Relatórios:**\n
+            * A consulta que buscava os diários não carregava os relacionamentos das tabelas completamente, gerando erros na montagem do relatório pdf.\n
+             Corrigido, os relacionamentos entre as tabelas são carregados forçadamente junto com a consulta.
+            * Diários podem ser registrados sem fotos, a tela de Relatórios foi atualizada para lidar com esses diários sem fotos.\n
+            **Relatório PDF:**
+            * Atualizado para lidar com relatórios sem fotos. O campo observações mostrará a mensagem 'Este diário não possui fotos registradas' junto\n
+            com quaisquer observações que o diário possua. Além disso, as assinaturas foram movidas para a primeira folha quando não hover fotos.\n 
+            * Retirada a contagem de páginas.\n
+            **Configurações:**\n
+            * Qualquer serviço padrão podia ser excluído, caso algum serviço que está em uso por algum diário fosse excluído geraria um erro pela falta\n
+            da referência. Já que a o diário apontaria para um serviço que não existe mais. Corrigido, caso um serviço padrão esteja registrado em algum diário,\n
+            ele não poderá ser apagado. Uma mensagem aparecerá quando o usuário colocar o mouse sobre o botão especificando o motivo de não conseguir excluir.\n
+
+            ''')
+    st.subheader('1.2')
+    st.write('''
+            **Configurações:**\n
+            * Criada a tela para registro/edição/exclusão dos serviços padrão. Facilitando o preenchimento do diário de obra com opções\n
+             de serviço padronizados.\n
+            **Cadastro/Edição de Diário:**\n
+            * Telas de cadastro e edição do diário de obras agora abrem uma caixa de seleção para que o usário escolha qual serviço foi\n
+            realizado no dia do registro. Ainda não é possível fazer registros enquanto grava o diário, Eles devem ser registrados no menu\n
+            Configurações\Serviços Padrão.\n
+            * Ao tentar editar um diário que já tinha sido incluído em um relatório o sistema negava a edição. Corrigido, como o diário pode\n
+            passar batido com erros, bloquear a edição impede a correção. O impedimento foi retirado.
+            * Imagens que representam o clima (limpo, nublado, chuvae impraticável) foram refeitas para incluir o nome do que simbolizam\n
+            para contextualização mais fácil e rápida. Tanto na criação, edição, avaliação do diário.
+            **Tela inicial:**\n
+            * Inserido logo modificado da Rudra para personalização do programa.\n
+            **Relatório PDF:**\n
+            * Nos casos em que há muitos serviços e as descrições são muito longas os campos posteriores são jogados pra baixo,\n
+            desfigurando o relatório. Corrigido, os campos de Produção tiveram suas linhas e tamanho da fonte reduzidas. Ocupando menos espaço.\n
+            Além disso, o campo Observações foi bastante reduzido pois os textos que ele pode receber são pequenos.
+
+            ''')
+    st.subheader('1.1')
+    st.write('''
+            **Edição de Contratos:**\n
+            * Contratos não poderiam ser apagados. Corrigido, contratos que não possuem obras e/ou diários\n
+            atrelados a ele podem ser excluídos na tela de Edição de Contratos usando o expander que aparece logo acima. Caso haja alguma obra\diário\n
+            atrelados ao contrato a exclusão já se torna impossível. Nesse caso ele pode ser desativado para não aparecer mais nos campos de\n
+             registro de obras e diários.\n
+            **Edição de Obras:**\n
+            * Mensagem de desativação da Obra era a mesa da Ativação. Corrigidas e cada situação tem sua mensagem correspondente.\n
+            * Obras não poderiam ser apagadas. Corrigido, obras que não possuem diários atrelados a elas\n
+            podem ser excluídas na tela de Edição de Obras usando o expander que aparece logo acima. Caso haja algum diário\n
+            atrelado à obra, a exclusão já se torna impossível. Nesse caso ela pode ser desativada para não aparecer mais nos campos de registro de diários.\n
+            **Edição de Diários:**\n
+            * Campos de datas estavam no formato americano. Corrigido, os campos apresentam datas no formato brasileiro.\n
+            * Diários não poderiam ser apagados. Corrigido, Na tela de Edição de Diários, há uma aba de nome "Excluir". Basta seguir o processo de exclusão.\n
+            **Relatório:**\n
+            * Nomes de contrato longos acabam saindo do campo correspondente ou até da folha. Corrigido e nomes mais longos quebram \n
+            a linha assim que chegam no limite do campo continuando logo abaixo.\n
+            * O cabeçalho RELATÓRIO FOTOGRÁFICO que deve aparecer em cada página que possui fotos só aparecia na primeira página\n
+            de fotos do diário. Corrigido, agora ele é gerado junto com cada página.\n
+            * A marcação do clima da madrugada não acontecia, apesar de estar gravado no diário. Corrigido, agora o clima marcado \n
+            para madrugada marca corretamente a posição.\n
+            * Fotos dos diário não ficavam dimensionadas corretamente, tendo tamanhos diferentes e fora do padrão. Corrigido, agora \n
+            as fotos são dimensionadas no registro ou edição do diário, padronizando a altura e largura. Dessa forma, haverão no máximo 6 fotos por folha.
+            ''')
+    st.subheader('1.0')
+    st.write('''
+                    Contratos: cadastrar, editar, ativar e desativar para não aceitar mais obras ou diários.\n
+                    Obras: cadastrar, editar, ativar e desativar para não aceitar mais diários\n
+                    Diários: cadastrar, editar, fotos são acrescentadas e carregadas\n
+                    Efetivo Padrão: 2 opções de preenchimento, Padrão que é o que o mais comum ou digitar o efetivo para casos que o padrão não será usado.\n
+                    Relatório: Gera um pdf com todos os campos do relatório original. Agregando todas as fotos.\n
+                    Configurações: Permite alteração de senha do usuário, definir a pasta de armazenamento das fotos e alterar o Efetivo Padrão caso haja uma mudança que será recorrente.
+                ''')

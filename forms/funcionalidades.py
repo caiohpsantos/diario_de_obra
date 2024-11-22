@@ -14,6 +14,7 @@ from models import session, Contrato, Obra, Foto, Efetivo_Direto, Efetivo_Indire
 from sqlalchemy import func
 from sqlalchemy.exc import PendingRollbackError
 
+
 #Abre arquivo de configurações
 with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -309,13 +310,13 @@ class PDF(FPDF):
     #         fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT'
     #     )
 
-    def footer(self):
-        # Position cursor at 1.5 cm from bottom:
-        self.set_y(-2)
-        # Setting font: helvetica italic 8
-        self.set_font("helvetica", "B", 10)
-        # Printing page number:
-        self.cell(w=0, h=1, txt=f"Página {self.page_no()}", align="C")
+    # def footer(self):
+    #     # Position cursor at 1.5 cm from bottom:
+    #     self.set_y(-2)
+    #     # Setting font: helvetica italic 8
+    #     self.set_font("helvetica", "B", 10)
+    #     # Printing page number:
+    #     self.cell(w=0, h=1, txt=f"Página {self.page_no()}", align="C")
     
     def desenhar_margens(self):
         # Define as bordas ao redor do documento
@@ -547,54 +548,75 @@ def gera_relatorios(diarios):
         pdf.cell(h=0.2, w=0,new_x='LMARGIN', new_y='NEXT',text='') #linha em branco
 
         #Campo de observações
-        pdf.set_font(style="B", size=10)
+        if diario.fotos:
+            msg = "\n NÃO HÁ FOTOS REGISTRADAs PARA ESSE DIÁRIO."
+        else:
+            msg = ""
+            
+        pdf.set_font(style="B", size=6)
         pdf.set_fill_color(200,200,200)
         pdf.cell(0,0.7,"Observações", fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT')
         pdf.set_fill_color(255,255,255)
-        pdf.cell(0,1,diario.observacoes, fill=True, align="C", new_x='LMARGIN', new_y='NEXT')
+        pdf.cell(0,1,diario.observacoes+msg, fill=True, align="C", new_x='LMARGIN', new_y='NEXT')
 
         # Configurações iniciais do cabeçalho
         pdf.set_font(style="B", size=14)
         pdf.set_fill_color(255, 255, 255)
         
+        if diario.fotos:
+            # Configurações gerais
+            col_width = pdf.epw / 2  # Divide a largura da página em 2 colunas
+            row_height = (pdf.h - pdf.t_margin - pdf.b_margin) / 4  # Divide o espaço restante em 4 linhas
+            images_per_page = 6  # Total de imagens por página
 
-        # Configurações gerais
-        col_width = pdf.epw / 2  # Divide a largura da página em 2 colunas
-        row_height = (pdf.h - pdf.t_margin - pdf.b_margin) / 4  # Divide o espaço restante em 4 linhas
-        images_per_page = 6  # Total de imagens por página
+            # Divide as fotos em grupos de 6 para cada página
+            grupos_fotos = [diario.fotos[i:i + images_per_page] for i in range(0, len(diario.fotos), images_per_page)]
 
-        # Divide as fotos em grupos de 6 para cada página
-        grupos_fotos = [diario.fotos[i:i + images_per_page] for i in range(0, len(diario.fotos), images_per_page)]
+            # Itera sobre os grupos de fotos para criar páginas
+            for grupo in grupos_fotos:
+                pdf.add_page()
 
-        # Itera sobre os grupos de fotos para criar páginas
-        for grupo in grupos_fotos:
-            pdf.add_page()
+                # Insere uma célula no topo da página
+                pdf.set_font("helvetica", "B", 12)  # Configura a fonte para o cabeçalho
+                pdf.cell(
+                0, 0.7, f"RELATÓRIO FOTOGRÁFICO {diario.data.strftime("%d/%m/%Y")}",
+                fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT'
+            )
+                with pdf.table(
+                    col_widths=[col_width] * 2,  # Duas colunas de largura igual
+                    line_height=row_height,
+                    text_align="CENTER",
+                    first_row_as_headings=False,
+                    borders_layout="NONE"
+                ) as table:
+                    for i in range(0, len(grupo), 2):  # Adiciona fotos em pares (2 por linha)
+                        linha = table.row()
+                        for foto in grupo[i:i + 2]:  # Garante que não exceda o número de colunas
+                            linha.cell(img=foto.caminho_arquivo, img_fill_width=True)
 
+            # Posiciona a imagem final no rodapé, se necessário
+            altura = 1
+            largura = 12
+            y_pos = pdf.h - pdf.b_margin - altura  # Altura total - margem inferior - altura da imagem
+            x_pos = (pdf.w - largura) / 2  # Centraliza a imagem horizontalmente
+
+            pdf.image('images\\campo_assinatura.png', x=x_pos, y=y_pos, w=largura, keep_aspect_ratio=True)
+        
+        else:
             # Insere uma célula no topo da página
             pdf.set_font("helvetica", "B", 12)  # Configura a fonte para o cabeçalho
             pdf.cell(
-            0, 0.7, f"RELATÓRIO FOTOGRÁFICO {diario.data.strftime("%d/%m/%Y")}",
-            fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT'
-        )
-            with pdf.table(
-                col_widths=[col_width] * 2,  # Duas colunas de largura igual
-                line_height=row_height,
-                text_align="CENTER",
-                first_row_as_headings=False,
-                borders_layout="NONE"
-            ) as table:
-                for i in range(0, len(grupo), 2):  # Adiciona fotos em pares (2 por linha)
-                    linha = table.row()
-                    for foto in grupo[i:i + 2]:  # Garante que não exceda o número de colunas
-                        linha.cell(img=foto.caminho_arquivo, img_fill_width=True)
+                0, 0.7, f"RELATÓRIO FOTOGRÁFICO {diario.data.strftime("%d/%m/%Y")}",
+                fill=True, align="C", border=True, new_x='LMARGIN', new_y='NEXT'
+                        )
 
-        # Posiciona a imagem final no rodapé, se necessário
-        altura = 1
-        largura = 12
-        y_pos = pdf.h - pdf.b_margin - altura  # Altura total - margem inferior - altura da imagem
-        x_pos = (pdf.w - largura) / 2  # Centraliza a imagem horizontalmente
+            # Posiciona a imagem final no rodapé, se necessário
+            altura = 1
+            largura = 12
+            y_pos = pdf.h - pdf.b_margin - altura  # Altura total - margem inferior - altura da imagem
+            x_pos = (pdf.w - largura) / 2  # Centraliza a imagem horizontalmente
 
-        pdf.image('images\\campo_assinatura.png', x=x_pos, y=y_pos, w=largura, keep_aspect_ratio=True)
+            pdf.image('images\\campo_assinatura.png', x=x_pos, y=y_pos, w=largura, keep_aspect_ratio=True)
         
     pdf_temporario = io.BytesIO()
     pdf.output(pdf_temporario)

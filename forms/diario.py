@@ -8,6 +8,7 @@ from models import session, Contrato, Obra, Diario, Foto, Servicos, Efetivo_Dire
 from .funcionalidades import salvar_fotos_na_pasta, apagar_foto, apagar_servico, apagar_funcao, apagar_fotos_na_pasta, apagar_diario
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import joinedload
 
 
 def novo_diario():
@@ -207,11 +208,6 @@ def novo_diario():
                         st.error(f"Corrija as funções com quantidade incorreta: {', '.join(map(str, erro_presente))}")
                         problema = True
 
-                    #Verificas e há fotos para cadastrar
-                    if not fotos:
-                        st.error("Não há fotos registradas para este diário. Verifique acima.")
-                        problema = True
-
                     #Verificas e já há um diário cadastrado para a dupla contrato/obra no dia preenchido
                     if session.query(Diario).filter_by(obra_id = obra_do_diario.id, data=data).first() is not None:
                         st.error(f"Já existe um diário gravado para este contrato/obra no dia {data.strftime("%d/%m/%Y")}")
@@ -235,7 +231,7 @@ def novo_diario():
                         continuar = True
 
                         # Gravar as fotos
-                        if continuar == True:
+                        if continuar == True and fotos:
                             try:
                                 caminho_arquivos_salvos = salvar_fotos_na_pasta(contrato_do_diario, obra_do_diario, novo_diario, fotos)
                                 for caminho in caminho_arquivos_salvos:
@@ -359,8 +355,10 @@ def edita_diario():
         if data_inicio > data_fim:
             st.error("A data inicial deve ser anterior ou igual à data final.")
         else:
-            # Base da consulta
-            query = session.query(Diario).join(Obra).join(Contrato)
+            
+            query = session.query(Diario).join(Diario.obra).join(Obra.contrato).options(
+                        joinedload(Diario.obra).joinedload(Obra.contrato)  # Carrega obra e contrato associados
+                    )
 
             # Aplica filtros selecionados
             if contrato_selecionado:
@@ -374,13 +372,17 @@ def edita_diario():
             if numero_diario:
                 query = query.filter(Diario.id == numero_diario)
 
-            # Executa a pesquisa
+            # Executa a consulta
             diarios_resultados = query.all()
-
+           
             # Exibe os resultados
             if diarios_resultados:
                 
-                diario_opcoes = {f"{d.data.strftime('%d/%m/%Y')} - {d.obra.contrato.nome} - {d.obra.nome} - DIÁRIO {d.id}": d for d in diarios_resultados}
+                diario_opcoes = {
+                                    f"{d.data.strftime('%d/%m/%Y')} - {d.obra.contrato.nome} - {d.obra.nome} - DIÁRIO {d.id}": d
+                                    for d in diarios_resultados
+                                    if d.obra and d.obra.contrato
+                                }
                 diario_selecionado = st.radio("Selecione um Diário:", list(diario_opcoes.keys()), index=None)
                 if diario_selecionado:
                     diario_selecionado_obj = diario_opcoes[diario_selecionado]
@@ -469,20 +471,22 @@ def edita_diario():
                         # Dicionário para armazenar a produção
                         producao = {}
 
-                        #Consulta todos os serviços padrão pra montar as opções do selectbox
+                        # Consulta todos os serviços padrão para montar as opções do selectbox
                         opcoes_servicos = {servico.descricao: servico.id for servico in session.query(Servicos_Padrao).order_by(Servicos_Padrao.descricao).all()}
 
                         # Cria campos de entrada de acordo com o número selecionado no slider
-                        #
                         for i in range(num_campos_servicos):
                             col_servico_padrao, col_referencia, col_deletar = st.columns([2, 2, 1], vertical_alignment="center")
-                            
+
+                            # Variáveis para armazenar dados do serviço atual
+                            servico_selecionado_id = None
+                            referencia = None
+
                             # Verifica se já existem registros de serviços cadastrados
                             if i < len(servicos_cadastrados_diario):
                                 registro = servicos_cadastrados_diario[i]
-                                
                                 with col_servico_padrao:
-                                    # Obtem o id do serviço padrão cadastrado
+                                    # Obtém o id do serviço padrão cadastrado
                                     servico_padrao_id = registro.servicos_padrao_id
 
                                     # Localiza a descrição correspondente ao ID cadastrado
@@ -495,14 +499,18 @@ def edita_diario():
                                     servico_selecionado = st.selectbox(
                                         f"Descrição do Serviço {i + 1} (Cadastrado)",
                                         options=list(opcoes_servicos.keys()),
-                                        key=f"descricao_do_servico_existente{i + 1}",
+                                        key=f"descricao_do_servico_existente_{i+1}",
                                         index=index_servico
                                     )
-                                    servico_selecionado_id = opcoes_servicos[servico_selecionado]  # Obtém o id do serviço selecionado
+                                    servico_selecionado_id = opcoes_servicos[servico_selecionado]
 
                                 with col_referencia:
-                                    referencia = st.text_input(f"Referência {i + 1} (Cadastrado)", key=f"referencia_cadastrada_{i+1}", value=registro.referencia).upper()
-                                
+                                    referencia = st.text_input(
+                                        f"Referência {i + 1} (Cadastrado)",
+                                        key=f"referencia_cadastrada_{i+1}",
+                                        value=registro.referencia
+                                    ).upper()
+
                                 with col_deletar:
                                     if st.button("Deletar este Serviço", key=f"deletar_funcao_{registro.id}"):
                                         apagar_servico(registro)
@@ -510,36 +518,38 @@ def edita_diario():
                             else:
                                 # Se não houver registro suficiente, cria novos campos vazios
                                 with col_servico_padrao:
-                                    servico_selecionado = st.selectbox(f"Descrição do Serviço {i + 1} (Novo)", options=list(opcoes_servicos.keys()), key=f"descricao_do_servico_novo_{i+1}")
+                                    servico_selecionado = st.selectbox(
+                                        f"Descrição do Serviço {i + 1} (Novo)",
+                                        options=list(opcoes_servicos.keys()),
+                                        key=f"descricao_do_servico_novo_{i+1}"
+                                    )
                                     servico_selecionado_id = opcoes_servicos[servico_selecionado]
-                                
+
                                 with col_referencia:
-                                    referencia = st.text_input(f"Referência {i + 1} (Nova)", key=f"referencia_nova_{i+1}").upper()
+                                    referencia = st.text_input(
+                                        f"Referência {i + 1} (Nova)",
+                                        key=f"referencia_nova_{i+1}"
+                                    ).upper()
 
-
-                                # Armazena a descrição e referência se ambos estiverem preenchidos
+                            # Armazena a descrição e referência no dicionário `producao`
                             if servico_selecionado_id and referencia:
-                                    producao[i + 1] = {'servico_padrao_id': servico_padrao_id, 'referencia': referencia}
+                                producao[i + 1] = {'servico_padrao_id': servico_selecionado_id, 'referencia': referencia}
 
                         # Gravação dos serviços
                         if st.button("Gravar Serviços"):
                             problema = False
 
-                            if diario_selecionado_obj.relatorio_emitido:
-                                st.error("Este diário já foi incluído em um relatório mensal, portanto não pode ser alterado.")
-
                             if not producao:
                                 st.error("É necessário pelo menos 1 serviço para cada diário. Preencha algum no campo acima.")
                                 problema = True
-                            
-                            if problema == False:
 
+                            if problema == False:
                                 for i in range(num_campos_servicos):
                                     # Verifica se estamos lidando com um serviço existente
                                     if i < len(servicos_cadastrados_diario):
                                         registro = servicos_cadastrados_diario[i]
                                         # Atualiza o registro existente
-                                        registro.servico_padrao_id = producao[i + 1]['servico_padrao_id']
+                                        registro.servicos_padrao_id = producao[i + 1]['servico_padrao_id']
                                         registro.referencia = producao[i + 1]['referencia']
                                         session.commit()
                                     else:
@@ -552,8 +562,10 @@ def edita_diario():
                                         )
                                         session.add(novo_servico)
                                         session.commit()
+
                                 # Confirma as alterações no banco de dados
                                 st.success("Serviços gravados com sucesso!")
+
 
                     #Aba que trata da mão de obra alocada
                     with tab_efetivo:
@@ -728,17 +740,20 @@ def edita_diario():
                         st.subheader("Remover Foto")
                         fotos_registradas = session.query(Foto).filter_by(diario_id=diario_selecionado_obj.id).all()
                         
-                        for foto in fotos_registradas:
+                        if fotos_registradas:
+                            for foto in fotos_registradas:
 
-                            col_image, col_botao = st.columns([2,1], vertical_alignment="center",)
+                                col_image, col_botao = st.columns([2,1], vertical_alignment="center",)
 
-                            with col_image:
-                                st.image(foto.caminho_arquivo, width=900)
+                                with col_image:
+                                    st.image(foto.caminho_arquivo, width=900)
 
-                            with col_botao:
+                                with col_botao:
                                  if st.button("Remover esta foto", key=f"Apagar_foto_id{foto.id}"):
                                     apagar_foto(foto)
 
+                        else:
+                            st.info("Não há fotos registradas para esse diário")
                     #Aba que trata da exclusão do diário
                     with tab_exclusao:
                         
@@ -747,7 +762,7 @@ def edita_diario():
                             if st.button("Excluir", key=f"excluir_diario_{diario_selecionado_obj.id}"):
                                 apagar_diario(diario_selecionado_obj)
                         
-                else:
+            else:
                     st.info("Nenhum diário encontrado para os critérios selecionados.")
 
 
